@@ -1,0 +1,13 @@
+scriptencoding utf-8
+Describe Misc:
+  Before
+    let s = oreo#o#lim#misc#get_sfuncs('autoload/oreo.vim')
+  End
+  It s:expand_reciroot()
+    set shellslash
+    Assert Equals(s.expand_reciroot('.'), getcwd())
+    Assert Equals(s.expand_reciroot('%'), expand('%:p:h'))
+    Assert Equals(s.expand_reciroot('~/Dropbox'), expand('~/Dropbox'))
+    Assert Equals(s.expand_reciroot('~/Dropbox/vimfiles/../dotfiles'), expand('~/Dropbox/dotfiles'))
+  End
+End

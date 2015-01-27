@@ -1,0 +1,227 @@
+*oreo.txt*	オレオレライブラリ管理プラグイン。ライブラリを組込化する。
+
+Author  : LeafCage <leafcage+vim @ gmail.com>
+License : MIT license  {{{
+    Permission is hereby granted, free of charge, to any person obtaining
+    a copy of this software and associated documentation files (the
+    "Software"), to deal in the Software without restriction, including
+    without limitation the rights to use, copy, modify, merge, publish,
+    distribute, sublicense, and/or sell copies of the Software, and to
+    permit persons to whom the Software is furnished to do so, subject to
+    the following conditions:
+    The above copyright notice and this permission notice shall be included
+    in all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+    OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+    MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+    IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+    TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+}}}
+
+==============================================================================
+目次						*oreo-contents*
+
+概要				|oreo-introduction|
+使い方				|oreo-usage|
+インターフェイス		|oreo-interface|
+  変数				  |oreo-variables|
+  コマンド			  |oreo-commands|
+
+
+==============================================================================
+概要						*oreo-introduction*
+
+*oreo* は autoload/ 以下を提供するライブラリプラグインを別のプラグインに組込
+化して、それらを管理するプラグインです。
+組み込まれたライブラリはライブラリから独立し、組み込まれたプラグイン固有のもの
+になります。
+ライブラリをバージョンアップしても、組み込まれた方のライブラリには影響を与えま
+せん（ただしグローバル変数や大文字で始まるグローバル関数を扱っていた場合には影
+響は受ける）。
+ユーザ側から見るとあるプラグインを使うためにそれに依存する複数のプラグインまで
+インストールしなければいけないという面倒をなくすことができます。
+
+最新版:
+https://github.com/LeafCage/oreo.vim
+
+
+==============================================================================
+使い方						*oreo-usage*
+
+まずは変数|g:oreo#config_dir|を設定して下さい。このディレクトリ以下にoreoで管
+理しているライブラリの情報が保存されます。
+そして変数|g:oreo#libs|を設定して下さい。この変数に管理したいライブラリを登録
+します。この変数は辞書になっているので、キーにライブラリの任意の名前、値にライ
+ブラリのルートパスを登録して下さい。
+
+ライブラリを登録し終わりましたら、ライブラリを組み込みたいプラグインを開いて
+|:OreoAttract|コマンドを実行してください。
+|:OreoAttract|は vital.vim の|:Vitalize|コマンドに当たります。
+ちゃんとライブラリが認識されているなら、登録確認メッセージが表示されます。
+
+組み込んだライブラリを使うときには、組み込んだライブラリの autoload 関数名には
+プレフィックスが付きます。それは通常組み込まれたプラグインの名前が使われます。
+destplug というプラグインに mylib というライブラリを組み込んだ場合、mylibの関
+数|mylib#myfunc()|は、destplugに組み込まれたものは、|destplug#o#mylib#myfunc()|
+になります。
+mylib#myfunc() の前に destplug#o# というプレフィックスが付きます。
+
+
+==============================================================================
+インターフェイス				*oreo-interface*
+
+------------------------------------------------------------------------------
+変数						*oreo-variables*
+
+g:oreo#config_dir				*g:oreo#config_dir*
+	既定値: "~/.config/vim/oreo.vim"
+	|oreo|が生成する管理用のファイルはこのディレクトリに作られる。
+
+
+g:oreo#libs					*g:oreo#libs*
+	既定値: {}
+	キーにライブラリのエイリアス、値にそのライブラリのルートパスを登録する
+	。次のように登録する。 >
+		let g:oreo#libs = {"mylib" : "~/.vim/bundle/mylib"}
+<	エイリアスが "-" で始まるものはオプション引数とかぶるために利用できな
+	い。"." や "/" は名前に含むことが出来ない。"%" といった名前も誤爆の可
+	能性があるので推奨されない。
+
+
+g:oreo#is_verticaldiff				*g:oreo#is_verticaldiff*
+	既定値: 1
+	非0なら|:OreoDiff|で開かれるウィンドウの分割方法が垂直分割になる。
+
+
+------------------------------------------------------------------------------
+コマンド					*oreo-commands*
+
+						*:OreoAttract*
+:OreoAttract [{option} ..] [{lib} [{module} ..]]
+	オプション --root が指定されればそのディレクトリ以下に、そうでなければ
+	現在編集中のバッファが所属するプラグインのルートディレクトリ以下にライ
+	ブラリ名{lib}で指定したライブラリのモジュール全てを組み込む。
+	その一部のモジュールだけを組み込みたい場合、続く引数にモジュール名
+	{module}を与えることで、指定したモジュールだけ組み込むことができる。
+	モジュール名は autoload/ より下のパスになる。
+
+	ライブラリ名{lib}を与えずに実行した場合、現在組み込まれているモジュー
+	ルの状態を一覧する。
+	NOTE: インターフェイスの制約により、複数種類のライブラリ{lib}を一括で
+	組み込むことは出来ない。このコマンド一回につき1種類のライブラリを組み
+	込むことしかできない。
+
+	options~
+	--root={dir} -r={dir}
+		ライブラリの組み込み先となるディレクトリ。
+		{dir}には . (カレントディレクトリ) や .. (ディレクトリを上る)
+		% :h といった特別なワードが利用できる。
+		省略時には現在編集中のバッファが所属するプラグインのルートディ
+		レクトリが推測され、それが使われる。
+	--name={reciname} -n={reciname}
+		ライブラリが組み込まれる際、{reciname}のディレクトリが作られ
+		、その中にインストールされる。{reciname}はautoload関数名で使
+		えるものでなければならない。すなわちアルファベットと数字と "_"
+		からならねばならない。
+		省略時にはプラグイン名が推測され、それが使われる。
+		すでにそのプラグインに他のライブラリが組み込まれているのなら、
+		このオプションは無効になり以前組み込んだ名前が使われる。
+	--verpersonalize -v
+		スクリプト中の バッファローカル変数、ウィンドウローカル変数、
+		タブページローカル変数、グローバル変数を組み込み先専用で利用で
+		きるように改名する。改名には{reciname}がプレフィックスとして利
+		用される。
+		引数bはバッファローカル変数|b:var|、wはウィンドウローカル変数
+		|w:var|、tはタブページローカル変数|t:var|、gはグローバル変数
+		|g:var|である。これらの文字の組み合わせでどの種類の変数を専用
+		化するかを指定する。
+		というのは嘘で、
+		このオプションを指定すると、実行前にどの変数を個別化するかを尋
+		ねられる。
+		NOTE: このオプションはまだ実装されていない。
+
+
+						*:OreoExtract*
+:OreoExtract [{option} ..] [{module} ..]
+:OreoExtract --lib [{option} ..] [{lib} ..]
+:OreoExtract -l [{option} ..] [{lib} ..]
+	オプション --root が指定されればそのディレクトリ以下の、そうでなければ
+	現在編集中のバッファが所属するプラグインのルートディレクトリ以下の、全
+	てのライブラリを除去する。
+	モジュール名{module}を与えるとそのモジュールだけ削除する。
+	オプション --lib を渡すと、モジュール名の代わりにライブラリ名{lib}を指
+	定する。指定したライブラリに属するモジュール全てを対象とする。
+
+	options~
+	--root={dir} -r={dir}
+		このディレクトリに組み込まれているライブラリを対象とする。
+		{dir}には . (カレントディレクトリ) や .. (ディレクトリを上る)
+		% :h といった特別なワードが利用できる。
+		省略時には現在編集中のバッファが所属するプラグインのルートディ
+		レクトリが推測され、それが使われる。
+	--lib -l
+		ライブラリ単位で対象を指定する。
+
+
+						*:OreoUpdate*
+:OreoUpdate [{option} ..] [{module} ..]
+:OreoUpdate --lib [{option} ..] [{lib} ..]
+:OreoUpdate -l [{option} ..] [{lib} ..]
+	オプション --root が指定されればそのディレクトリ以下の、そうでなければ
+	現在編集中のバッファが所属するプラグインのルートディレクトリ以下の、そ
+	のプラグインに組み込まれているライブラリを更新する。
+	モジュール名{module}を与えるとそのモジュールだけ更新する。
+	オプション --lib を渡すと、モジュール名の代わりにライブラリ名{lib}を指
+	定する。指定したライブラリに属するモジュール全てを対象とする。
+
+	options~
+	--root={dir} -r={dir}
+		このディレクトリに組み込まれているライブラリを対象とする。
+		{dir}には . (カレントディレクトリ) や .. (ディレクトリを上る)
+		% :h といった特別なワードが利用できる。
+		省略時には現在編集中のバッファが所属するプラグインのルートディ
+		レクトリが推測され、それが使われる。
+	--lib -l
+		ライブラリ単位で対象を指定する。
+
+
+:OreoStatus [{option} ..] [{lib} ..]		*:OreoStatus*
+	オプション --root が指定されればそのディレクトリ以下の、そうでなければ
+	現在編集中のバッファが所属するプラグインのルートディレクトリ以下のその
+	プラグインに組み込まれているライブラリのステータスを表示する。
+	ライブラリ名{lib}を渡すと、そのライブラリについて、組み込み済みのモジ
+	ュールとそうでないモジュールを表示する。
+
+	options~
+	--root={dir} -r={dir}
+		このディレクトリに組み込まれているライブラリを対象とする。
+		{dir}には . (カレントディレクトリ) や .. (ディレクトリを上る)
+		% :h といった特別なワードが利用できる。
+		省略時には現在編集中のバッファが所属するプラグインのルートディ
+		レクトリが推測され、それが使われる。
+
+
+:OreoLog				*:OreoLog*
+	|:OreoAttract||:OreoExtract||:OreoUpdate|で変更した履歴を閲覧する。
+
+
+:OreoDiff [{option}] {module}		*:OreoDiff*
+	オプション --root が指定されればそのディレクトリ以下の、そうでなければ
+	現在編集中のバッファが所属するプラグインのルートディレクトリ以下の、そ
+	のプラグインに組み込まれているモジュールと、その原本となるライブラリの
+	モジュールとの差分を見る。
+
+	options~
+	--root={dir} -r={dir}
+		このディレクトリに組み込まれているライブラリを対象とする。
+		{dir}には . (カレントディレクトリ) や .. (ディレクトリを上る)
+		% :h といった特別なワードが利用できる。
+		省略時には現在編集中のバッファが所属するプラグインのルートディ
+		レクトリが推測され、それが使われる。
+
+
+==============================================================================
+vim:tw=78:ts=8:ft=help:norl:noet:fen:
