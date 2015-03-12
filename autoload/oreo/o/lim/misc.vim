@@ -166,7 +166,7 @@ endfunction
 function! oreo#o#lim#misc#get_plugins_root_and_name_and_actualname(path) "{{{
   let [rootpath, pluginname] = s:_get_rootpath_and_pluginname_of(fnamemodify(expand(a:path), ':p'))
   if rootpath == ''
-    return [rootpath, pluginname, pluginname]
+    return []
   end
   let actualname = s:_get_actual_pluginname(rootpath)
   return [rootpath, pluginname, actualname]

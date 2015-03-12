@@ -141,10 +141,11 @@ function! s:newReci(reciroot, reciname) "{{{
 endfunction
 "}}}
 function! s:_infer_reciroot_and_pluginname(path) "{{{
-  let [rootdir, pluginname, actualname] = oreo#o#lim#misc#get_plugins_root_and_name_and_actualname(a:path)
-  if rootdir==''
+  let result = oreo#o#lim#misc#get_plugins_root_and_name_and_actualname(a:path)
+  if result==[]
     return ['', '']
   end
+  let [rootdir, pluginname, actualname] = result
   let pluginname = actualname=='' ? pluginname : actualname
   return [rootdir, pluginname]
 endfunction
