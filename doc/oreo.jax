@@ -65,9 +65,9 @@ https://github.com/LeafCage/oreo.vim
 組み込んだライブラリを使うときには、組み込んだライブラリの autoload 関数名には
 プレフィックスが付きます。それは通常組み込まれたプラグインの名前が使われます。
 destplug というプラグインに mylib というライブラリを組み込んだ場合、mylibの関
-数|mylib#myfunc()|は、destplugに組み込まれたものは、|destplug#o#mylib#myfunc()|
+数|mylib#myfunc()|は、destplugに組み込まれたものは、|destplug_l#mylib#myfunc()|
 になります。
-mylib#myfunc() の前に destplug#o# というプレフィックスが付きます。
+mylib#myfunc() の前に destplug_l# というプレフィックスが付きます。
 
 
 ==============================================================================

@@ -58,7 +58,7 @@ endfunction
 
 "=============================================================================
 "Vim:
-function! oreo#o#lim#misc#get_cmdresults(cmd) "{{{
+function! oreo_l#lim#misc#get_cmdresults(cmd) "{{{
   let save_vfile = &verbosefile
   set verbosefile=
   redir => result
@@ -69,17 +69,17 @@ function! oreo#o#lim#misc#get_cmdresults(cmd) "{{{
 endfunction
 "}}}
 
-function! oreo#o#lim#misc#get_sid(...) "{{{
+function! oreo_l#lim#misc#get_sid(...) "{{{
   let path = !a:0 ? expand('%:p') : fnamemodify(expand(a:1), ':p')
-  let snames = oreo#o#lim#misc#get_cmdresults('scriptnames')
+  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
   call map(snames, 'substitute(v:val, ''\s*\d*\s*:\s*\(.*\)'', ''\=expand(submatch(1))'', "")')
   let path = get(snames, 0, '')=~'\\' ? substitute(path, '/', '\\', 'g') : substitute(path, '\\', '/', 'g')
   let sid = index(snames, path, 0, 1)+1
   return sid
 endfunction
 "}}}
-function! oreo#o#lim#misc#match_sids(pat) "{{{
-  let snames = oreo#o#lim#misc#get_cmdresults('scriptnames')
+function! oreo_l#lim#misc#match_sids(pat) "{{{
+  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
   let sids = []
   let i = match(snames, escape(a:pat, ' .\'))+1
   while i
@@ -90,15 +90,15 @@ function! oreo#o#lim#misc#match_sids(pat) "{{{
   return sids
 endfunction
 "}}}
-function! oreo#o#lim#misc#get_scriptpath(sid) "{{{
-  let snames = oreo#o#lim#misc#get_cmdresults('scriptnames')
+function! oreo_l#lim#misc#get_scriptpath(sid) "{{{
+  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
   let path = substitute(get(snames, a:sid-1, ''), '^\s*\d\+:\s\+', '', '')
   return path=='' ? '' : fnamemodify(path, ':p')
 endfunction
 "}}}
-function! oreo#o#lim#misc#get_scriptinfos(...) "{{{
+function! oreo_l#lim#misc#get_scriptinfos(...) "{{{
   let pat = !a:0 ? expand('%') : type(a:1)==s:TYPE_NR ? '^\s*'.a:1.':' : escape(a:1, ' .\')
-  let snames = oreo#o#lim#misc#get_cmdresults('scriptnames')
+  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
   let ret = []
   let idx = match(snames, pat)
   while idx!=-1
@@ -109,20 +109,20 @@ function! oreo#o#lim#misc#get_scriptinfos(...) "{{{
 endfunction
 "}}}
 
-function! oreo#o#lim#misc#get_sfuncs(...) "{{{
+function! oreo_l#lim#misc#get_sfuncs(...) "{{{
   let path = a:0 ? expand(a:1) : expand('%')
-  let sid = oreo#o#lim#misc#get_sid(path)
+  let sid = oreo_l#lim#misc#get_sid(path)
   if !sid
     if !(path==expand('%') || path==expand('%:p'))
       exe 'source' path
-      let sid = oreo#o#lim#misc#get_sid(path)
+      let sid = oreo_l#lim#misc#get_sid(path)
     end
     if !sid
       return {}
     end
   end
   let prefix = '<SNR>'. sid. '_'
-  let funcs = oreo#o#lim#misc#get_cmdresults('function')
+  let funcs = oreo_l#lim#misc#get_cmdresults('function')
   let filter_pat = '^\s*function '. prefix
   let map_pat = prefix. '\zs\w\+'
   let ret = {}
@@ -133,7 +133,7 @@ function! oreo#o#lim#misc#get_sfuncs(...) "{{{
 endfunction
 "}}}
 
-function! oreo#o#lim#misc#hlecho(fmt, ...) "{{{
+function! oreo_l#lim#misc#hlecho(fmt, ...) "{{{
   for list in a:000
     exe 'echohl' get(list, 0, '')
     echon get(list, 1, '')
@@ -145,7 +145,7 @@ endfunction
 
 "======================================
 "Data:
-function! oreo#o#lim#misc#uniq(list) "{{{
+function! oreo_l#lim#misc#uniq(list) "{{{
   return s:newUniqfier(a:list).mill()
 endfunction
 "}}}
@@ -153,17 +153,17 @@ endfunction
 
 "======================================
 "System:
-function! oreo#o#lim#misc#path_encode(path) "{{{
+function! oreo_l#lim#misc#path_encode(path) "{{{
   return substitute(a:path, '[=:/\\]', '\=get({"=": "==", ":": "=-"}, submatch(0), "=+")', 'g')
 endfunction
 "}}}
-function! oreo#o#lim#misc#path_decode(fname) "{{{
+function! oreo_l#lim#misc#path_decode(fname) "{{{
   return substitute(a:fname, '==\|=+\|=-', '\={"==": "=", "=-": ":", "=+": "/"}[submatch(0)]', 'g')
 endfunction
 "}}}
 
 
-function! oreo#o#lim#misc#get_plugins_root_and_name_and_actualname(path) "{{{
+function! oreo_l#lim#misc#get_plugins_root_and_name_and_actualname(path) "{{{
   let [rootpath, pluginname] = s:_get_rootpath_and_pluginname_of(fnamemodify(expand(a:path), ':p'))
   if rootpath == ''
     return []

@@ -113,7 +113,7 @@ endfunction
 "=============================================================================
 "Main:
 let s:Cmdcmpl = {}
-function! oreo#o#lim#cmddef#newCmdcmpl(cmdline, cursorpos, ...) abort "{{{
+function! oreo_l#lim#cmddef#newCmdcmpl(cmdline, cursorpos, ...) abort "{{{
   let obj = copy(s:Cmdcmpl)
   let funcopts = a:0 ? a:1 : {}
   let obj.longoptbgn = get(funcopts, 'longoptbgn', '--')
@@ -230,7 +230,7 @@ endfunction
 
 "--------------------------------------
 let s:CmdParser = {}
-function! oreo#o#lim#cmddef#newCmdParser(args, ...) "{{{
+function! oreo_l#lim#cmddef#newCmdParser(args, ...) "{{{
   let obj = copy(s:CmdParser)
   let funcopts = a:0 ? a:1 : {}
   let obj.longoptbgn = get(funcopts, 'longoptbgn', '--')

@@ -13,9 +13,9 @@ command! -nargs=* -complete=customlist,oreo#cmpl_libs   OreoStatus    call oreo#
 command! -nargs=0   OreoLog    call oreo#log()
 command! -nargs=+ -complete=customlist,oreo#cmpl_diff  OreoDiff    call oreo#enter_diff([<f-args>])
 
-if !exists('#o_lock')
-  aug o_lock
-    autocmd BufEnter */autoload/*/o/**/*.vim  call oreo#lock()
+if !exists('#lib_lock')
+  aug lib_lock
+    autocmd BufEnter */autoload/*_l/**/*.vim  call oreo#lock()
   aug END
 endif
 aug oreo

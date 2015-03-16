@@ -2,7 +2,7 @@ if exists('s:save_cpo')| finish| endif
 let s:save_cpo = &cpo| set cpo&vim
 scriptencoding utf-8
 "=============================================================================
-let s:MESON = 'o'
+let s:MESON = '_l'
 let s:UNKNOWN = ' '
 let s:TYPE_LIST = type([])
 let s:LOGLIMIT = 20
@@ -135,13 +135,13 @@ function! s:newReci(reciroot, reciname) "{{{
     return obj
   end
   let obj._namedir = printf('%s/autoload/%s', obj.root, obj.name)
-  let obj.dir = obj._namedir. '/'. s:MESON
+  let obj.dir = obj._namedir. s:MESON
   let obj.modules = s:fetch_modules(obj.dir)
   return obj
 endfunction
 "}}}
 function! s:_infer_reciroot_and_pluginname(path) "{{{
-  let result = oreo#o#lim#misc#get_plugins_root_and_name_and_actualname(a:path)
+  let result = oreo_l#lim#misc#get_plugins_root_and_name_and_actualname(a:path)
   if result==[]
     return ['', '']
   end
@@ -241,8 +241,8 @@ endfunction
 "}}}
 function! s:Lib.get_recifyline(module, reciname) "{{{
   let libalnames_pat = self._get_libalnames_pat()
-  let meson = printf('#%s#\0', s:MESON)
-  return map(readfile(self.aldir.'/'.a:module), 'substitute(v:val, libalnames_pat, a:reciname. meson, "g")')
+  let sub = a:reciname. s:MESON. '#\0'
+  return map(readfile(self.aldir.'/'.a:module), 'substitute(v:val, libalnames_pat, sub, "g")')
 endfunction
 "}}}
 
@@ -467,11 +467,12 @@ let s:Log = {}
 function! s:newLog(...) "{{{
   let obj = copy(s:Log)
   let dir = expand(g:oreo#config_dir)
-  let obj.silo = oreo#o#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
+  let obj.silo = oreo_l#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
   let obj.entriespath = dir.'/entries'
   let obj.entries = filereadable(obj.entriespath) ? readfile(obj.entriespath) : [s:LOGVERSION]
   let obj.version = remove(obj.entries, 0)
   if obj.version != s:LOGVERSION
+    "TODO
   end
   let obj.reci = a:0 ? a:1 : ''
   if a:0==2
@@ -555,7 +556,7 @@ endfunction
 "}}}
 "--------------------------------------
 function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo#o#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   if cmpl.should_optcmpl()
     if reciroot==''
@@ -582,7 +583,7 @@ function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo#o#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.mill([['--lib', '-l'], ['--root=', '-r=']])
   end
@@ -598,7 +599,7 @@ function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_update(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo#o#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.mill([['--lib', '-l'], ['--root=', '-r='], ['--verpersonalize', '-v']])
   end
@@ -619,7 +620,7 @@ function! oreo#cmpl_libs(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_diff(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo#o#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.mill([['--root=', '-r=']])
   end
@@ -638,7 +639,7 @@ function! oreo#enter_attract(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo#o#lim#cmddef#newCmdParser(a:args)
+  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], ''], 'reciname': [['--name', '-n'], ''], 'verpersonalize': [['--verpersonalize', '-v'], 0]})
   let reci = s:newReci(opts.reciroot, opts.reciname)
   if reci.is_invalid
@@ -665,7 +666,7 @@ function! s:_common_enter_update(args, optdict) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo#o#lim#cmddef#newCmdParser(a:args)
+  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options(a:optdict)
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -685,7 +686,7 @@ function! oreo#enter_status(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo#o#lim#cmddef#newCmdParser(a:args)
+  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -699,7 +700,7 @@ function! oreo#enter_diff(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo#o#lim#cmddef#newCmdParser(a:args)
+  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
