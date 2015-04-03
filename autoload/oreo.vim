@@ -141,13 +141,11 @@ function! s:newReci(reciroot, reciname) "{{{
 endfunction
 "}}}
 function! s:_infer_reciroot_and_pluginname(path) "{{{
-  let result = oreo_l#lim#misc#get_plugins_root_and_name_and_actualname(a:path)
-  if result==[]
+  let inference = oreo_l#lim#misc#infer_plugin_pathinfo(a:path)
+  if inference=={}
     return ['', '']
   end
-  let [rootdir, pluginname, actualname] = result
-  let pluginname = actualname=='' ? pluginname : actualname
-  return [rootdir, pluginname]
+  return [inference.root, inference.name]
 endfunction
 "}}}
 function! s:Reci.mill_hadmodules(libmodules) "{{{
@@ -560,7 +558,7 @@ function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   if cmpl.should_optcmpl()
     if reciroot==''
-      let [reciroot, reciname] = s:_infer_reciroot_and_pluginname(expand('%:p'))
+      let reciroot = get(oreo_l#lim#misc#infer_plugin_pathinfo(expand('%:p')), 'root', '')
     end
     let maybename = globpath(reciroot, 'autoload/*/l/')
     if maybename==''

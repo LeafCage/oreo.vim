@@ -5,18 +5,18 @@ scriptencoding utf-8
 let s:TYPE_NR = type(0)
 
 "Misc:
-function! s:_get_rootpath_and_pluginname_of(path) "{{{
+function! s:_get_rootpath_and_rootname_of(path) "{{{
   for dir in ['after', 'autoload', 'plugin', 'syntax', 'ftplugin', 'ftdetect']
     let findpath = finddir(dir, a:path. ';**/vimfiles;**/.vim')
     if findpath == ''
       continue
     end
     let rootpath = fnamemodify(findpath, ':p:h:h')
-    let pluginname = fnamemodify(rootpath, ':t:r')
-    if pluginname =~# '^\%(vimfiles\|\.vim\)$'
+    let rootname = fnamemodify(rootpath, ':t:r')
+    if rootname =~# '^\%(vimfiles\|\.vim\)$'
       continue
     end
-    return [rootpath, pluginname]
+    return [rootpath, rootname]
   endfor
   return ['', '']
 endfunction
@@ -58,6 +58,12 @@ endfunction
 
 "=============================================================================
 "Vim:
+function! oreo_l#lim#misc#expand_keycodes(str) "{{{
+  return substitute(a:str, '<\S\{-1,}>', '\=eval(''"\''. submatch(0). ''"'')', 'g')
+endfunction
+"}}}
+
+
 function! oreo_l#lim#misc#get_cmdresults(cmd) "{{{
   let save_vfile = &verbosefile
   set verbosefile=
@@ -133,6 +139,7 @@ function! oreo_l#lim#misc#get_sfuncs(...) "{{{
 endfunction
 "}}}
 
+
 function! oreo_l#lim#misc#hlecho(fmt, ...) "{{{
   for list in a:000
     exe 'echohl' get(list, 0, '')
@@ -163,13 +170,13 @@ endfunction
 "}}}
 
 
-function! oreo_l#lim#misc#get_plugins_root_and_name_and_actualname(path) "{{{
-  let [rootpath, pluginname] = s:_get_rootpath_and_pluginname_of(fnamemodify(expand(a:path), ':p'))
+function! oreo_l#lim#misc#infer_plugin_pathinfo(path) "{{{
+  let [rootpath, rootname] = s:_get_rootpath_and_rootname_of(fnamemodify(expand(a:path), ':p'))
   if rootpath == ''
-    return []
+    return {}
   end
   let actualname = s:_get_actual_pluginname(rootpath)
-  return [rootpath, pluginname, actualname]
+  return {'root': rootpath, 'name': (actualname=='' ? rootname : actualname), 'rootname': rootname, 'actualname': actualname}
 endfunction
 "}}}
 
