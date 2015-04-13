@@ -140,16 +140,6 @@ endfunction
 "}}}
 
 
-function! oreo_l#lim#misc#hlecho(fmt, ...) "{{{
-  for list in a:000
-    exe 'echohl' get(list, 0, '')
-    echon get(list, 1, '')
-  endfor
-  echoh
-endfunction
-"}}}
-
-
 "======================================
 "Data:
 function! oreo_l#lim#misc#uniq(list) "{{{
