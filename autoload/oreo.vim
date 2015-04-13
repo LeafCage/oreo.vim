@@ -247,18 +247,18 @@ endfunction
 let s:Cmp = {}
 function! s:newCmp(lib, reci, reqmodules) "{{{
   let obj = copy(s:Cmp)
-  let obj.reqmodules = a:reqmodules
+  let obj._reqmodules = a:reqmodules
   let obj.lib = a:lib
   let obj.reci = a:reci
-  let obj.attracted_modules = a:reci.pick_hadmodules(copy(a:lib.modules))
+  let obj._attracted_modules = a:reci.pick_hadmodules(copy(a:lib.modules))
   let librecifylines = {}
   let recilines = {}
-  let notequals = {}
-  let [obj.librecifylines, obj.recilines, obj.notequals] = [librecifylines, recilines, notequals]
-  for module in obj.attracted_modules
+  let not_equals = {}
+  let [obj._librecifylines, obj._recilines, obj._not_equals] = [librecifylines, recilines, not_equals]
+  for module in obj._attracted_modules
     let librecifylines[module] = a:lib.get_recifyline(module, a:reci.name)
     let recilines[module] = a:reci.get_lines(module)
-    let notequals[module] = librecifylines[module] !=# recilines[module]
+    let not_equals[module] = librecifylines[module] !=# recilines[module]
   endfor
   return obj
 endfunction
@@ -278,11 +278,11 @@ endfunction
 "}}}
 function! s:Cmp.show_status() "{{{
   call self._echo_header()
-  for module in self.attracted_modules + filter(copy(self.reqmodules), 'index(self.attracted_modules, v:val)==-1')
-    if !has_key(self.notequals, module)
+  for module in self._attracted_modules + filter(copy(self._reqmodules), 'index(self._attracted_modules, v:val)==-1')
+    if !has_key(self._not_equals, module)
       echoh OreoAdd | echo ' + Add      '| echoh OreoBold
-    elseif self.notequals[module]
-      if index(self.reqmodules, module)==-1
+    elseif self._not_equals[module]
+      if index(self._reqmodules, module)==-1
         echoh OreoNotEqual | echo ' !          '| echoh NONE
       else
         echoh OreoUpdate | echo ' ! Update   '| echoh OreoBold
@@ -297,12 +297,12 @@ endfunction
 "}}}
 function! s:Cmp.show_deletestatus() "{{{
   call self._echo_header()
-  for module in self.attracted_modules + filter(copy(self.reqmodules), 'index(self.attracted_modules, v:val)==-1')
-    if !has_key(self.notequals, module)
+  for module in self._attracted_modules + filter(copy(self._reqmodules), 'index(self._attracted_modules, v:val)==-1')
+    if !has_key(self._not_equals, module)
       echoh OreoQuiet | echo ' ?          '| echoh OreoBold
-    elseif index(self.reqmodules, module)!=-1
-      echoh OreoDelete | echo (self.notequals[module] ? ' !' : ' -'). ' Delete   '| echoh OreoBold
-    elseif self.notequals[module]
+    elseif index(self._reqmodules, module)!=-1
+      echoh OreoDelete | echo (self._not_equals[module] ? ' !' : ' -'). ' Delete   '| echoh OreoBold
+    elseif self._not_equals[module]
       echoh OreoNotEqual | echo ' !          '| echoh NONE
     else
       echoh NONE | echo '            '| echoh NONE
@@ -314,11 +314,11 @@ endfunction
 "}}}
 function! s:Cmp.show_ststatus() "{{{
   call self._echo_header()
-  "for module in self.attracted_modules + self.reci.mill_hadmodules(copy(self.lib.modules))
+  "for module in self._attracted_modules + self.reci.mill_hadmodules(copy(self.lib.modules))
   for module in self.reci.modules
-    if !has_key(self.notequals, module)
+    if !has_key(self._not_equals, module)
       echoh OreoQuiet | echo ' -          '
-    elseif self.notequals[module]
+    elseif self._not_equals[module]
       echoh OreoNotEqual | echo ' !          '| echoh NONE
     else
       echoh NONE | echo '            '| echoh NONE
@@ -329,12 +329,12 @@ function! s:Cmp.show_ststatus() "{{{
 endfunction
 "}}}
 function! s:Cmp.attract() "{{{
-  let self._donemodules = self.reqmodules
+  let self._donemodules = self._reqmodules
   if self._donemodules==[]
     return
   end
   for module in self._donemodules
-    call self.reci.write_and_source(module, has_key(self.librecifylines, module) ? self.librecifylines[module] : self.lib.get_recifyline(module, self.reci.name))
+    call self.reci.write_and_source(module, has_key(self._librecifylines, module) ? self._librecifylines[module] : self.lib.get_recifyline(module, self.reci.name))
   endfor
   call self._echo_header()
   for module in self._donemodules
@@ -345,7 +345,7 @@ function! s:Cmp.attract() "{{{
 endfunction
 "}}}
 function! s:Cmp.extract() "{{{
-  let self._donemodules = self.reqmodules
+  let self._donemodules = self._reqmodules
   if self._donemodules==[]
     return
   end
@@ -362,12 +362,12 @@ function! s:Cmp.extract() "{{{
 endfunction
 "}}}
 function! s:Cmp.update() "{{{
-  let self._donemodules = filter(copy(self.reqmodules), 'self.notequals[v:val]')
+  let self._donemodules = filter(copy(self._reqmodules), 'self._not_equals[v:val]')
   if self._donemodules==[]
     return
   end
   for module in self._donemodules
-    call self.reci.write_and_source(module, self.librecifylines[module])
+    call self.reci.write_and_source(module, self._librecifylines[module])
   endfor
   call self._echo_header()
   for module in self._donemodules
@@ -380,8 +380,8 @@ endfunction
 function! s:Cmp.log(log) "{{{
   call a:log.register(self.lib.name, self._donemodules)
   for module in self._donemodules
-    if has_key(self.recilines, module)
-      call a:log.backup(self.recilines[module], module)
+    if has_key(self._recilines, module)
+      call a:log.backup(self._recilines[module], module)
     end
   endfor
 endfunction
@@ -397,12 +397,12 @@ function! s:newUnknowns(reci, libs, ...) "{{{
     call filter(modules, 'index(libmodules, v:val)==-1')
   endfor
   let obj.modules = modules
-  let obj.reqmodules = !a:0 ? [] : a:1==[] ? modules : a:1
-  call filter(obj.reqmodules, 'index(modules, v:val)!=-1')
-  let obj.isreq = obj.reqmodules!=[]
-  let obj.recilines = {}
-  for module in obj.reqmodules
-    let obj.recilines[module] = a:reci.get_lines(module)
+  let obj._reqmodules = !a:0 ? [] : a:1==[] ? modules : a:1
+  call filter(obj._reqmodules, 'index(modules, v:val)!=-1')
+  let obj.isreq = obj._reqmodules!=[]
+  let obj._recilines = {}
+  for module in obj._reqmodules
+    let obj._recilines[module] = a:reci.get_lines(module)
   endfor
   return obj
 endfunction
@@ -438,7 +438,7 @@ function! s:Unknowns.show_deletestatus() "{{{
   end
   call self._echo_header()
   for module in self.modules
-    if index(self.reqmodules, module)==-1
+    if index(self._reqmodules, module)==-1
       echoh OreoQuiet | echo ' ?          '
     else
       echoh OreoDelete | echo ' ? Delete   '
@@ -456,7 +456,7 @@ function! s:Unknowns.log(log) "{{{
   end
   call a:log.register(s:UNKNOWN, self._donemodules)
   for module in self._donemodules
-    call a:log.backup(self.recilines[module], module)
+    call a:log.backup(self._recilines[module], module)
   endfor
 endfunction
 "}}}
@@ -465,7 +465,7 @@ let s:Log = {}
 function! s:newLog(...) "{{{
   let obj = copy(s:Log)
   let dir = expand(g:oreo#config_dir)
-  let obj.silo = oreo_l#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
+  let obj._silo = oreo_l#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
   let obj.entriespath = dir.'/entries'
   let obj.entries = filereadable(obj.entriespath) ? readfile(obj.entriespath) : [s:LOGVERSION]
   let obj.version = remove(obj.entries, 0)
@@ -488,7 +488,7 @@ function! s:Log._prepare_insert(backuproot) "{{{
     return
   end
   let self.entries = self.entries[: s:LOGLIMIT-1]
-  call self.silo.ndelete({'time': join(self.entries, '\|')})
+  call self._silo.ndelete({'time': join(self.entries, '\|')})
   let backupdirs = split(globpath(a:backuproot, '*/'), "\n")
   for dir in filter(backupdirs, 'index(self.entries, fnamemodify(v:val, ":h:t:gs?;?:?:s?_.\\+$??"))==-1')
     call s:import_vital()
@@ -502,7 +502,7 @@ endfunction
 "}}}
 function! s:Log.register(libname, modules) "{{{
   for module in a:modules
-    call self.silo.insert([self.time, self.cmd, a:libname, self.reci.name, self.reci.root, module])
+    call self._silo.insert([self.time, self.cmd, a:libname, self.reci.name, self.reci.root, module])
   endfor
 endfunction
 "}}}
@@ -515,13 +515,13 @@ function! s:Log.backup(lines, module) "{{{
 endfunction
 "}}}
 function! s:Log.commit() "{{{
-  call self.silo.commit()
+  call self._silo.commit()
   call writefile(insert(self.entries, self.version), self.entriespath)
 endfunction
 "}}}
 function! s:Log.show() "{{{
   let SIGNS = {'Attract': '+', 'Extract': '-', 'Update': '!'}
-  let records = self.silo.select_grouped({}, ['time', 'cmd', 'reciname', 'reciroot'], 'libname', 'module')
+  let records = self._silo.select_grouped({}, ['time', 'cmd', 'reciname', 'reciroot'], 'libname', 'module')
   for [time, cmd, reciname, reciroot, recs] in reverse(records)[:7]
     echoh OreoBold
     echo printf('%s  %s  ', time, cmd)
