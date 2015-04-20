@@ -3,8 +3,9 @@ let s:save_cpo = &cpo| set cpo&vim
 scriptencoding utf-8
 "=============================================================================
 let s:TYPE_LIST = type([])
-let s:TYPE_DICT = type({})
 let s:TYPE_STR = type('')
+let s:TYPE_NUM = type(0)
+let s:TYPE_FLOAT = type(0.0)
 
 "Misc:
 function! s:split_into_words(cmdline) "{{{
@@ -16,6 +17,57 @@ function! s:_matches(pat, list) "{{{
     return filter(a:list, 'index(a:pat, v:val)!=-1')
   end
   return filter(a:list, 'v:val =~ a:pat')
+endfunction
+"}}}
+function! s:dictify_{s:TYPE_STR}(candidate) "{{{
+  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
+endfunction
+"}}}
+function! s:dictify_{s:TYPE_NUM}(candidate) "{{{
+  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
+endfunction
+"}}}
+function! s:dictify_{s:TYPE_FLOAT}(candidate) "{{{
+  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
+endfunction
+"}}}
+function! s:dictify_{s:TYPE_LIST}(candidatelist) "{{{
+  if a:candidatelist==[]
+    return {}
+  end
+  let type = type(a:candidatelist[0])
+  if !(type==s:TYPE_NUM || type==s:TYPE_FLOAT || type==s:TYPE_STR && a:candidatelist[0]!='')
+    return {}
+  end
+  let ret = {'word': a:candidatelist[0], 'is_parm': 0, 'division': {}}
+  call s:_fill_canddict(ret, a:candidatelist[1:])
+  return ret
+endfunction
+"}}}
+function! s:dictify_2(invalid) "{{{
+  return {}
+endfunction
+"}}}
+function! s:dictify_4(invalid) "{{{
+  return {}
+endfunction
+"}}}
+function! s:_fill_canddict(canddict, groups) "{{{
+  for group in a:groups
+    let type = type(group)
+    if type==s:TYPE_LIST
+      call s:_fill_canddict(a:canddict, group)
+    elseif type==s:TYPE_STR
+      if group=='__PARM'
+        let a:canddict.is_parm = 1
+      elseif group!=''
+        let a:canddict.division[group] = 1
+      end
+    elseif type==s:TYPE_NUM || type==s:TYPE_FLOAT
+      let a:canddict.division[string(group)] = 1
+    end
+    unlet group
+  endfor
 endfunction
 "}}}
 
@@ -57,71 +109,6 @@ function! s:_solve_variadic_for_set_default(variadic, default) "{{{
 endfunction
 "}}}
 
-let s:Classifier = {}
-function! s:newClassifier(candidates, longoptbgn, shortoptbgn) "{{{
-  let obj = copy(s:Classifier)
-  let obj.candidates = a:candidates
-  let obj._longoptbgn = '^'.a:longoptbgn
-  let obj._shortoptbgn = '^'.a:shortoptbgn
-  let obj.short = []
-  let obj.long = []
-  let obj.other = []
-  return obj
-endfunction
-"}}}
-function! s:Classifier.set_classified_candies(...) "{{{
-  let self.beens = a:0 ? a:1 : []
-  for candy in self.candidates
-    call self._classify_candy(candy)
-    unlet candy
-  endfor
-endfunction
-"}}}
-function! s:Classifier.join_candidates(order, sort) "{{{
-  for elm in ['long', 'short', 'other']
-    if get(a:sort, elm, -1) != -1
-      exe 'call sort(self[elm], '. (empty(a:sort[elm]) ? '' : a:sort[elm]). ')'
-    end
-  endfor
-  let ret = []
-  for name in a:order
-    if has_key(self, name)
-      call extend(ret, self[name])
-    else
-      echoerr 'invalid order name:' order
-    end
-  endfor
-  return ret
-endfunction
-"}}}
-function! s:Classifier._classify_candy(candy) "{{{
-  if type(a:candy)!=s:TYPE_LIST
-    if index(self.beens, a:candy)==-1
-      call self._add(a:candy)
-    end
-    return
-  end
-  for cand in a:candy
-    if index(self.beens, cand)!=-1
-      return
-    end
-  endfor
-  for cand in a:candy
-    call self._add(cand)
-  endfor
-endfunction
-"}}}
-function! s:Classifier._add(candy) "{{{
-   if a:candy =~ self._longoptbgn
-     return add(self.long, a:candy)
-   elseif a:candy =~ self._shortoptbgn
-     return add(self.short, a:candy)
-   else
-     return add(self.other, a:candy)
-   end
-endfunction
-"}}}
-
 
 "=============================================================================
 "Main:
@@ -131,8 +118,6 @@ function! oreo_l#lim#cmddef#newCmdcmpl(cmdline, cursorpos, ...) abort "{{{
   let behavior = a:0 ? a:1 : {}
   let obj._longoptbgn = get(behavior, 'longoptbgn', '--')
   let obj._shortoptbgn = get(behavior, 'shortoptbgn', '-')
-  let obj._order = get(behavior, 'order', ['long', 'short', 'other'])
-  let obj._sort = get(behavior, 'sort', {'long': &ic, 'short': &ic, 'other': -1})
   let obj.cmdline = a:cmdline
   let obj.cursorpos = a:cursorpos
   let obj._is_on_edge = a:cmdline[a:cursorpos-1]!=' ' ? 0 : a:cmdline[a:cursorpos-2]!='/' || a:cmdline[a:cursorpos-3]=='/'
@@ -195,47 +180,37 @@ function! s:Cmdcmpl.match_lefts(pat) "{{{
   return s:_matches(a:pat, copy(self.leftwords))
 endfunction
 "}}}
-function! s:Cmdcmpl.filtered(candidates, ...) "{{{
-  let behavior = get(a:, 1, {})
-  let reuses = get(behavior, 'reuses', [])
-  let order = get(behavior, 'order', self._order)
-  let sort = get(behavior, 'sort', self._sort)
-  let matching = get(behavior, 'matching', 'forward')
-  let classifier = s:newClassifier(a:candidates, self._longoptbgn, self._shortoptbgn)
-  if type(reuses)==s:TYPE_LIST
-    let beens = filter(copy(self.beens), 'index(reuses, v:val)==-1')
-    call classifier.set_classified_candies(beens)
-  else
-    "TODO
-    call classifier.set_classified_candies()
-  end
-  let candidates = classifier.join_candidates(order, sort)
-  try
-    let candidates = self['_filtered_by_'. matching](candidates)
-  catch /E716:/
-    echoerr 'lim/cmddef: invalid argument > "'. behavior.matching . '"'
-  endtry
-  return candidates
+function! s:Cmdcmpl._filtered_by_inputed(candidates) "{{{
+  let canddicts = map(a:candidates, 's:dictify_{type(v:val)}(v:val)')
+  let should_del_groups = {}
+  for canddict in canddicts
+    if index(self.beens, get(canddict, 'word', ''))!=-1
+      call extend(should_del_groups, canddict.division)
+    end
+  endfor
+  let expr = should_del_groups=={} ? '' : '!('. join(map(keys(should_del_groups), '"has_key(v:val.division, ''". v:val. "'')"'), '||'). ') &&'
+  call filter(canddicts, 'v:val!={} && ( v:val.is_parm || '. expr. ' index(self.beens, v:val.word)==-1 )')
+  return map(canddicts, 'v:val.word')
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_none(candidates) "{{{
-  return a:candidates
+function! s:Cmdcmpl.filtered(candidates) "{{{
+  let candidates = self._filtered_by_inputed(a:candidates)
+  return filter(candidates, 'v:val =~ "^".self.arglead')
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_forward(candidates) "{{{
-  return filter(a:candidates, 'v:val =~ "^".self.arglead')
+function! s:Cmdcmpl.backward_filtered(candidates) "{{{
+  let candidates = self._filtered_by_inputed(a:candidates)
+  return filter(candidates, 'v:val =~ self.arglead."$"')
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_backword(candidates) "{{{
-  return filter(a:candidates, 'v:val =~ self.arglead."$"')
+function! s:Cmdcmpl.partial_filtered(candidates) "{{{
+  let candidates = self._filtered_by_inputed(a:candidates)
+  return filter(candidates, 'v:val =~ self.arglead')
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_partial(candidates) "{{{
-  return filter(a:candidates, 'v:val =~ self.arglead')
-endfunction
-"}}}
-function! s:Cmdcmpl._filtered_by_exact(candidates) "{{{
-  return filter(a:candidates, 'v:val == self.arglead')
+function! s:Cmdcmpl.exact_filtered(candidates) "{{{
+  let candidates = self._filtered_by_inputed(a:candidates)
+  return filter(candidates, 'v:val == self.arglead')
 endfunction
 "}}}
 

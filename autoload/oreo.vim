@@ -562,9 +562,9 @@ function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
     end
     let maybename = globpath(reciroot, 'autoload/*/l/')
     if maybename==''
-      return cmpl.filtered([['--root=', '-r='], ['--name=', '-n='], ['--verpersonalize', '-v']])
+      return cmpl.filtered([['--root=', 1], ['--name=', 2], ['--varpersonalize', 3], ['-r=', 1], ['-n=', 2], ['-v', 3]])
     else
-      return cmpl.filtered([['--root=', '-r='], ['--verpersonalize', '-v']])
+      return cmpl.filtered([['--root=' 1], ['--verpersonalize', 2], ['-r=', 1], ['-v', 2]])
     end
   end
   let libnames = s:get_libnames()
@@ -583,7 +583,7 @@ endfunction
 function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
   let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
-    return cmpl.filtered([['--lib', '-l'], ['--root=', '-r=']])
+    return cmpl.filtered([['--lib', 1], ['--root=', 2], ['-l', 1], ['-r=', 2]])
   end
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   let reci = s:newReci(reciroot, '')
@@ -599,7 +599,7 @@ endfunction
 function! oreo#cmpl_update(arglead, cmdline, curpos) "{{{
   let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
-    return cmpl.filtered([['--lib', '-l'], ['--root=', '-r='], ['--verpersonalize', '-v']])
+    return cmpl.filtered([['--lib', 1], ['--root=', 2], ['--verpersonalize', 3], ['-l', 1], ['-r=', 2], ['-v', 3]])
   end
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   let reci = s:newReci(reciroot, '')
@@ -620,7 +620,7 @@ endfunction
 function! oreo#cmpl_diff(arglead, cmdline, curpos) "{{{
   let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
-    return cmpl.filtered([['--root=', '-r=']])
+    return cmpl.filtered([['--root=', 1], ['-r=', 1]])
   end
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   let reci = s:newReci(reciroot, '')
