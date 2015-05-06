@@ -19,55 +19,79 @@ function! s:_matches(pat, list) "{{{
   return filter(a:list, 'v:val =~ a:pat')
 endfunction
 "}}}
-function! s:dictify_{s:TYPE_STR}(candidate) "{{{
-  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
-endfunction
-"}}}
-function! s:dictify_{s:TYPE_NUM}(candidate) "{{{
-  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
-endfunction
-"}}}
-function! s:dictify_{s:TYPE_FLOAT}(candidate) "{{{
-  return {'word': a:candidate, 'is_parm': 0, 'division': {}}
-endfunction
-"}}}
-function! s:dictify_{s:TYPE_LIST}(candidatelist) "{{{
-  if a:candidatelist==[]
-    return {}
-  end
-  let type = type(a:candidatelist[0])
-  if !(type==s:TYPE_NUM || type==s:TYPE_FLOAT || type==s:TYPE_STR && a:candidatelist[0]!='')
-    return {}
-  end
-  let ret = {'word': a:candidatelist[0], 'is_parm': 0, 'division': {}}
-  call s:_fill_canddict(ret, a:candidatelist[1:])
-  return ret
-endfunction
-"}}}
-function! s:dictify_2(invalid) "{{{
-  return {}
-endfunction
-"}}}
-function! s:dictify_4(invalid) "{{{
-  return {}
-endfunction
-"}}}
-function! s:_fill_canddict(canddict, groups) "{{{
-  for group in a:groups
-    let type = type(group)
+function! s:divisionholder(holder, divisions) "{{{
+  for division in a:divisions
+    let type = type(division)
     if type==s:TYPE_LIST
-      call s:_fill_canddict(a:canddict, group)
+      call s:divisionholder(a:holder, division)
     elseif type==s:TYPE_STR
-      if group=='__PARM'
-        let a:canddict.is_parm = 1
-      elseif group!=''
-        let a:canddict.division[group] = 1
+      if division!=''
+        let a:holder[division] = 1
       end
     elseif type==s:TYPE_NUM || type==s:TYPE_FLOAT
-      let a:canddict.division[string(group)] = 1
+      let a:holder[string(division)] = 1
     end
-    unlet group
+    unlet division
   endfor
+  return a:holder
+endfunction
+"}}}
+let s:Assorter = {}
+function! s:newAssorter(inputs) "{{{
+  let obj = copy(s:Assorter)
+  let obj.inputs = a:inputs
+  let obj.should_del_groups = {}
+  let obj.candidates = []
+  let obj.divisions = []
+  return obj
+endfunction
+"}}}
+function! s:Assorter.assort_candidates(candidates) "{{{
+  for cand in a:candidates
+    let type = type(cand)
+    if type!=s:TYPE_LIST
+      let cnd = type==s:TYPE_STR ? cand : string(cand)
+      if cnd!='' && index(self.inputs, cnd)==-1
+        call self._add([cnd], [{}])
+      end
+    elseif cand!=[]
+      call self._assort_listcand(cand)
+    end
+    unlet cand
+  endfor
+endfunction
+"}}}
+function! s:Assorter._assort_listcand(cand) "{{{
+  let type = type(a:cand[0])
+  if !(type==s:TYPE_NUM || type==s:TYPE_FLOAT || type==s:TYPE_STR && a:cand[0]!='')
+    return
+  end
+  let cnd = type==s:TYPE_STR ? a:cand[0] : string(a:cand[0])
+  let division = s:divisionholder({}, a:cand[1:])
+  if cnd!='' && index(self.inputs, cnd)==-1
+    call self._add([cnd], [division])
+    return
+  end
+  call extend(self.should_del_groups, division)
+  if has_key(division, '__PARM')
+    call self._add([cnd], [division])
+  end
+endfunction
+"}}}
+function! s:Assorter._add(cand, division) "{{{
+  let self.candidates += a:cand
+  let self.divisions += a:division
+endfunction
+"}}}
+function! s:Assorter.remove_del_grouped_candidates() "{{{
+  if has_key(self.should_del_groups, '__PARM')
+    unlet self.should_del_groups.__PARM
+  end
+  if self.should_del_groups!={}
+    let divisions = self.divisions
+    call filter(self.candidates, 'has_key(divisions[v:key], "__PARM") || !('. join(map(keys(self.should_del_groups), '"has_key(divisions[v:key], ''". v:val. "'')"'), '||'). ')')
+  end
+  return self.candidates
 endfunction
 "}}}
 
@@ -121,7 +145,7 @@ function! oreo_l#lim#cmddef#newCmdcmpl(cmdline, cursorpos, ...) abort "{{{
   let obj.cmdline = a:cmdline
   let obj.cursorpos = a:cursorpos
   let obj._is_on_edge = a:cmdline[a:cursorpos-1]!=' ' ? 0 : a:cmdline[a:cursorpos-2]!='/' || a:cmdline[a:cursorpos-3]=='/'
-  let [obj.command; obj.beens] = s:split_into_words(a:cmdline)
+  let [obj.command; obj.inputs] = s:split_into_words(a:cmdline)
   let obj.leftwords = s:split_into_words(a:cmdline[:(a:cursorpos-1)])[1:]
   let obj.arglead = obj._is_on_edge ? '' : obj.leftwords[-1]
   let obj.preword = obj._is_on_edge ? get(obj.leftwords, -1, '') : get(obj.leftwords, -2, '')
@@ -165,11 +189,11 @@ function! s:Cmdcmpl.is_matched(pat) "{{{
 endfunction
 "}}}
 function! s:Cmdcmpl.get(pat, ...) "{{{
-  return self._get_arg(a:pat, a:000, self.beens)
+  return self._get_arg(a:pat, a:000, self.inputs)
 endfunction
 "}}}
 function! s:Cmdcmpl.matches(pat) "{{{
-  return s:_matches(a:pat, copy(self.beens))
+  return s:_matches(a:pat, copy(self.inputs))
 endfunction
 "}}}
 function! s:Cmdcmpl.get_left(pat, ...) "{{{
@@ -180,36 +204,39 @@ function! s:Cmdcmpl.match_lefts(pat) "{{{
   return s:_matches(a:pat, copy(self.leftwords))
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_inputed(candidates) "{{{
+function! s:Cmdcmpl._filtered_by_inputs(candidates) "{{{
+  let assorter = s:newAssorter(self.inputs)
+  call assorter.assort_candidates(a:candidates)
+  return assorter.remove_del_grouped_candidates()
   let canddicts = map(a:candidates, 's:dictify_{type(v:val)}(v:val)')
   let should_del_groups = {}
   for canddict in canddicts
-    if index(self.beens, get(canddict, 'word', ''))!=-1
+    if index(self.inputs, get(canddict, 'word', ''))!=-1
       call extend(should_del_groups, canddict.division)
     end
   endfor
   let expr = should_del_groups=={} ? '' : '!('. join(map(keys(should_del_groups), '"has_key(v:val.division, ''". v:val. "'')"'), '||'). ') &&'
-  call filter(canddicts, 'v:val!={} && ( v:val.is_parm || '. expr. ' index(self.beens, v:val.word)==-1 )')
+  call filter(canddicts, 'v:val!={} && ( v:val.is_parm || '. expr. ' index(self.inputs, v:val.word)==-1 )')
   return map(canddicts, 'v:val.word')
 endfunction
 "}}}
 function! s:Cmdcmpl.filtered(candidates) "{{{
-  let candidates = self._filtered_by_inputed(a:candidates)
+  let candidates = self._filtered_by_inputs(a:candidates)
   return filter(candidates, 'v:val =~ "^".self.arglead')
 endfunction
 "}}}
 function! s:Cmdcmpl.backward_filtered(candidates) "{{{
-  let candidates = self._filtered_by_inputed(a:candidates)
+  let candidates = self._filtered_by_inputs(a:candidates)
   return filter(candidates, 'v:val =~ self.arglead."$"')
 endfunction
 "}}}
 function! s:Cmdcmpl.partial_filtered(candidates) "{{{
-  let candidates = self._filtered_by_inputed(a:candidates)
+  let candidates = self._filtered_by_inputs(a:candidates)
   return filter(candidates, 'v:val =~ self.arglead')
 endfunction
 "}}}
 function! s:Cmdcmpl.exact_filtered(candidates) "{{{
-  let candidates = self._filtered_by_inputed(a:candidates)
+  let candidates = self._filtered_by_inputs(a:candidates)
   return filter(candidates, 'v:val == self.arglead')
 endfunction
 "}}}

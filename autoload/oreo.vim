@@ -29,8 +29,8 @@ function! s:path_to_alname(module) "{{{
 endfunction
 "}}}
 function! s:invalidlib_warningmsg(libname) "{{{
-  let mes = has_key(g:oreo#libs, a:libname) ? printf('"%s/autoload" path is not found.', g:oreo#libs[a:libname]) : printf('"%s" key is not found in g:oreo#libs.', a:libname)
-  echoh WarningMsg| echom 'oreo.vim:' mes | echoh NONE
+  let mes = has_key(g:oreo#libs, a:libname) ? printf('"%s/autoload" path is not found. (lib:%s)', g:oreo#libs[a:libname], a:libname) : printf('"%s" key is not found in g:oreo#libs.', a:libname)
+  echoh WarningMsg| echom 'oreo lib-error:' mes | echoh NONE
 endfunction
 "}}}
 function! s:get_libnames() "{{{
@@ -83,7 +83,7 @@ endfunction
 function! s:get_updatecmps(reqset, reci, libs) "{{{
   let cmps = []
   for [libname, reqmodules] in items(a:reqset)
-    if libname==s:UNKNOWN
+    if libname==s:UNKNOWN || !has_key(a:libs, libname)
       continue
     end
     let lib = a:libs[libname]
@@ -393,6 +393,9 @@ function! s:newUnknowns(reci, libs, ...) "{{{
   let obj.reci = a:reci
   let modules = copy(a:reci.modules)
   for libname in s:get_libnames()
+    if !has_key(a:libs,libname)
+      continue
+    end
     let libmodules = a:libs[libname].modules
     call filter(modules, 'index(libmodules, v:val)==-1')
   endfor
