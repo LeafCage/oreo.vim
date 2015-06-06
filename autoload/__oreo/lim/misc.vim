@@ -58,13 +58,13 @@ endfunction
 
 "=============================================================================
 "Vim:
-function! oreo_l#lim#misc#expand_keycodes(str) "{{{
+function! __oreo#lim#misc#expand_keycodes(str) "{{{
   return substitute(a:str, '<\S\{-1,}>', '\=eval(''"\''. submatch(0). ''"'')', 'g')
 endfunction
 "}}}
 
 
-function! oreo_l#lim#misc#get_cmdresults(cmd) "{{{
+function! __oreo#lim#misc#get_cmdresults(cmd) "{{{
   let save_vfile = &verbosefile
   set verbosefile=
   redir => result
@@ -75,17 +75,17 @@ function! oreo_l#lim#misc#get_cmdresults(cmd) "{{{
 endfunction
 "}}}
 
-function! oreo_l#lim#misc#get_sid(...) "{{{
+function! __oreo#lim#misc#get_sid(...) "{{{
   let path = !a:0 ? expand('%:p') : fnamemodify(expand(a:1), ':p')
-  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
+  let snames = __oreo#lim#misc#get_cmdresults('scriptnames')
   call map(snames, 'substitute(v:val, ''\s*\d*\s*:\s*\(.*\)'', ''\=expand(submatch(1))'', "")')
   let path = get(snames, 0, '')=~'\\' ? substitute(path, '/', '\\', 'g') : substitute(path, '\\', '/', 'g')
   let sid = index(snames, path, 0, 1)+1
   return sid
 endfunction
 "}}}
-function! oreo_l#lim#misc#match_sids(pat) "{{{
-  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
+function! __oreo#lim#misc#match_sids(pat) "{{{
+  let snames = __oreo#lim#misc#get_cmdresults('scriptnames')
   let sids = []
   let i = match(snames, escape(a:pat, ' .\'))+1
   while i
@@ -96,15 +96,15 @@ function! oreo_l#lim#misc#match_sids(pat) "{{{
   return sids
 endfunction
 "}}}
-function! oreo_l#lim#misc#get_scriptpath(sid) "{{{
-  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
+function! __oreo#lim#misc#get_scriptpath(sid) "{{{
+  let snames = __oreo#lim#misc#get_cmdresults('scriptnames')
   let path = substitute(get(snames, a:sid-1, ''), '^\s*\d\+:\s\+', '', '')
   return path=='' ? '' : fnamemodify(path, ':p')
 endfunction
 "}}}
-function! oreo_l#lim#misc#get_scriptinfos(...) "{{{
+function! __oreo#lim#misc#get_scriptinfos(...) "{{{
   let pat = !a:0 ? expand('%') : type(a:1)==s:TYPE_NR ? '^\s*'.a:1.':' : escape(a:1, ' .\')
-  let snames = oreo_l#lim#misc#get_cmdresults('scriptnames')
+  let snames = __oreo#lim#misc#get_cmdresults('scriptnames')
   let ret = []
   let idx = match(snames, pat)
   while idx!=-1
@@ -115,20 +115,20 @@ function! oreo_l#lim#misc#get_scriptinfos(...) "{{{
 endfunction
 "}}}
 
-function! oreo_l#lim#misc#get_sfuncs(...) "{{{
+function! __oreo#lim#misc#get_sfuncs(...) "{{{
   let path = a:0 ? expand(a:1) : expand('%')
-  let sid = oreo_l#lim#misc#get_sid(path)
+  let sid = __oreo#lim#misc#get_sid(path)
   if !sid
     if !(path==expand('%') || path==expand('%:p'))
       exe 'source' path
-      let sid = oreo_l#lim#misc#get_sid(path)
+      let sid = __oreo#lim#misc#get_sid(path)
     end
     if !sid
       return {}
     end
   end
   let prefix = '<SNR>'. sid. '_'
-  let funcs = oreo_l#lim#misc#get_cmdresults('function')
+  let funcs = __oreo#lim#misc#get_cmdresults('function')
   let filter_pat = '^\s*function '. prefix
   let map_pat = prefix. '\zs\w\+'
   let ret = {}
@@ -142,7 +142,7 @@ endfunction
 
 "======================================
 "Data:
-function! oreo_l#lim#misc#uniq(list) "{{{
+function! __oreo#lim#misc#uniq(list) "{{{
   return s:newUniqfier(a:list).mill()
 endfunction
 "}}}
@@ -150,17 +150,17 @@ endfunction
 
 "======================================
 "System:
-function! oreo_l#lim#misc#path_encode(path) "{{{
+function! __oreo#lim#misc#path_encode(path) "{{{
   return substitute(a:path, '[=:/\\]', '\=get({"=": "==", ":": "=-"}, submatch(0), "=+")', 'g')
 endfunction
 "}}}
-function! oreo_l#lim#misc#path_decode(fname) "{{{
+function! __oreo#lim#misc#path_decode(fname) "{{{
   return substitute(a:fname, '==\|=+\|=-', '\={"==": "=", "=-": ":", "=+": "/"}[submatch(0)]', 'g')
 endfunction
 "}}}
 
 
-function! oreo_l#lim#misc#infer_plugin_pathinfo(path) "{{{
+function! __oreo#lim#misc#infer_plugin_pathinfo(path) "{{{
   let [rootpath, rootname] = s:_get_rootpath_and_rootname_of(fnamemodify(expand(a:path), ':p'))
   if rootpath == ''
     return {}

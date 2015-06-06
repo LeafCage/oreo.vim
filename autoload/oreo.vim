@@ -2,7 +2,7 @@ if exists('s:save_cpo')| finish| endif
 let s:save_cpo = &cpo| set cpo&vim
 scriptencoding utf-8
 "=============================================================================
-let s:MESON = '_l'
+let s:MESON = '__'
 let s:UNKNOWN = ' '
 let s:TYPE_LIST = type([])
 let s:LOGLIMIT = 20
@@ -128,20 +128,20 @@ function! s:newReci(reciroot, reciname) "{{{
     let [reciroot, reciname] = s:_infer_reciroot_and_pluginname(a ? expand('%:p:h') : a:reciroot)
   end
   let obj.root = a ? reciroot : s:expand_reciroot(a:reciroot)
-  let maybename = globpath(obj.root, 'autoload/*/l/')
-  let obj.name = maybename!='' ? matchstr(maybename, 'autoload/\zs.\{-1,}\ze/') : b ? reciname : a:reciname
+  let maybename = globpath(obj.root, 'autoload/'. s:MESON. '*/')
+  let obj.name = maybename!='' ? matchstr(maybename, 'autoload/'. s:MESON. '\zs.\{-1,}\ze/') : b ? reciname : a:reciname
   let obj.is_invalid = obj.root=='' || obj.name==''
   if obj.is_invalid
     return obj
   end
-  let obj._namedir = printf('%s/autoload/%s', obj.root, obj.name)
-  let obj.dir = obj._namedir. s:MESON
+  let obj._namedir = obj.root. '/autoload/'. obj.name
+  let obj.dir = obj.root. '/autoload/'. s:MESON. obj.name
   let obj.modules = s:fetch_modules(obj.dir)
   return obj
 endfunction
 "}}}
 function! s:_infer_reciroot_and_pluginname(path) "{{{
-  let inference = oreo_l#lim#misc#infer_plugin_pathinfo(a:path)
+  let inference = __oreo#lim#misc#infer_plugin_pathinfo(a:path)
   if inference=={}
     return ['', '']
   end
@@ -239,7 +239,7 @@ endfunction
 "}}}
 function! s:Lib.get_recifyline(module, reciname) "{{{
   let libalnames_pat = self._get_libalnames_pat()
-  let sub = a:reciname. s:MESON. '#\0'
+  let sub = s:MESON. a:reciname. '#\0'
   return map(readfile(self.aldir.'/'.a:module), 'substitute(v:val, libalnames_pat, sub, "g")')
 endfunction
 "}}}
@@ -468,7 +468,7 @@ let s:Log = {}
 function! s:newLog(...) "{{{
   let obj = copy(s:Log)
   let dir = expand(g:oreo#config_dir)
-  let obj._silo = oreo_l#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
+  let obj._silo = __oreo#lim#silo#newSilo(dir.'/log.silo', s:FIELDS)
   let obj.entriespath = dir.'/entries'
   let obj.entries = filereadable(obj.entriespath) ? readfile(obj.entriespath) : [s:LOGVERSION]
   let obj.version = remove(obj.entries, 0)
@@ -557,13 +557,13 @@ endfunction
 "}}}
 "--------------------------------------
 function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   if cmpl.should_optcmpl()
     if reciroot==''
-      let reciroot = get(oreo_l#lim#misc#infer_plugin_pathinfo(expand('%:p')), 'root', '')
+      let reciroot = get(__oreo#lim#misc#infer_plugin_pathinfo(expand('%:p')), 'root', '')
     end
-    let maybename = globpath(reciroot, 'autoload/*/l/')
+    let maybename = globpath(reciroot, 'autoload/'. s:MESON. '*/')
     if maybename==''
       return cmpl.filtered([['--root=', 1], ['--name=', 2], ['--varpersonalize', 3], ['-r=', 1], ['-n=', 2], ['-v', 3]])
     else
@@ -584,7 +584,7 @@ function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--lib', 1], ['--root=', 2], ['-l', 1], ['-r=', 2]])
   end
@@ -600,7 +600,7 @@ function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_update(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--lib', 1], ['--root=', 2], ['--verpersonalize', 3], ['-l', 1], ['-r=', 2], ['-v', 3]])
   end
@@ -621,7 +621,7 @@ function! oreo#cmpl_libs(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_diff(arglead, cmdline, curpos) "{{{
-  let cmpl = oreo_l#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--root=', 1], ['-r=', 1]])
   end
@@ -640,7 +640,7 @@ function! oreo#enter_attract(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], ''], 'reciname': [['--name', '-n'], ''], 'verpersonalize': [['--verpersonalize', '-v'], 0]})
   let reci = s:newReci(opts.reciroot, opts.reciname)
   if reci.is_invalid
@@ -667,7 +667,7 @@ function! s:_common_enter_update(args, optdict) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options(a:optdict)
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -687,7 +687,7 @@ function! oreo#enter_status(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -701,7 +701,7 @@ function! oreo#enter_diff(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = oreo_l#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid

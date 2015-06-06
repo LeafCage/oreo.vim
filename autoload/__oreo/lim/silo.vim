@@ -2,7 +2,7 @@ if exists('s:save_cpo')| finish| endif
 let s:save_cpo = &cpo| set cpo&vim
 scriptencoding utf-8
 "=============================================================================
-let g:oreo_l#lim#silo#rootdir = get(g:, 'oreo_l#lim#silo#rootdir', '~/.config/silo/'. matchstr(expand('<sfile>'), 'autoload/\zs.\{-1,}\ze/'))
+let g:__oreo#lim#silo#rootdir = get(g:, '__oreo#lim#silo#rootdir', '~/.config/silo/'. matchstr(expand('<sfile>'), 'autoload/\zs.\{-1,}\ze/'))
 let s:SEP = "\<C-k>\<Tab>"
 let s:TYPE_LIST = type([])
 let s:TYPE_DICT = type({})
@@ -132,7 +132,7 @@ function! s:Builder['_termsamples_'.s:TYPE_STR](records, fieldidx) "{{{
   let pat = s:_get_samplegetpat(a:fieldidx)
   let ret = map(a:records, 'matchstr(v:val, pat)')
   try
-    let ret = oreo_l#lim#misc#uniq(ret)
+    let ret = __oreo#lim#misc#uniq(ret)
   catch /E117/
     echoerr 'silo.select_grouped(): select_grouped() depends misc-module but it is not found.'
   endtry
@@ -142,7 +142,7 @@ endfunction
 function! s:Builder['_termsamples_'.s:TYPE_LIST](records, fieldidxs) "{{{
   let ret = map(a:records, 's:_inmap_buildterm(s:_listify(v:val), a:fieldidxs)')
   try
-    let ret = oreo_l#lim#misc#uniq(ret)
+    let ret = __oreo#lim#misc#uniq(ret)
   catch /E117/
     echoerr 'silo-select_grouped: select_grouped() depends misc-module but it is not found.'
   endtry
@@ -196,14 +196,14 @@ endfunction
 "=============================================================================
 "Public:
 let s:Silo = {}
-function! oreo_l#lim#silo#newSilo(name, fields, ...) abort "{{{
+function! __oreo#lim#silo#newSilo(name, fields, ...) abort "{{{
   let funcopt = a:0 ? a:1 : {}
   let obj = copy(s:Silo)
   let obj.key = get(funcopt, 'key', '')
-  let obj.path = a:name=~'[/\\]' ? a:name : expand(g:oreo_l#lim#silo#rootdir).'/'.a:name
+  let obj.path = a:name=~'[/\\]' ? a:name : expand(g:__oreo#lim#silo#rootdir).'/'.a:name
   let obj.dir = fnamemodify(obj.path, ':h')
   if s:_is_invalid_fields(a:fields)
-    echoerr 'oreo_l#lim#silo#newSilo(): invalid fields > '. string(a:fields)
+    echoerr '__oreo#lim#silo#newSilo(): invalid fields > '. string(a:fields)
   end
   let obj.fields = a:fields
   let obj.fieldslen = len(a:fields)
@@ -400,7 +400,7 @@ function! s:Silo.select_distinct(where, ...) "{{{
   let fmt = a:0 ? a:1 : []
   try
     let records = self._select(0, a:where, fmt)
-    let ret = oreo_l#lim#misc#uniq(records)
+    let ret = __oreo#lim#misc#uniq(records)
     return ret
   catch /silo: invalid \%(condition\|format\)/
     echoerr substitute(v:exception, 'silo', 'silo.select_distinct', '')
@@ -414,7 +414,7 @@ function! s:Silo.nselect_distinct(where, ...) "{{{
   let fmt = a:0 ? a:1 : []
   try
     let records = self._select(1, a:where, fmt)
-    let ret = oreo_l#lim#misc#uniq(records)
+    let ret = __oreo#lim#misc#uniq(records)
     return ret
   catch /silo: invalid \%(condition\|format\)/
     echoerr substitute(v:exception, 'silo', 'silo.select_distinct', '')
@@ -512,7 +512,7 @@ function! s:Silo.commit(...) "{{{
   let fields = [s:_innerstrify(self.fields)]
   call writefile(fields + self.records, self.path)
   if a:0
-    let rollbackpath = a:1=~'[/\\]' ? a:1 : expand(g:oreo_l#lim#silo#rootdir). '/backup/'. a:1
+    let rollbackpath = a:1=~'[/\\]' ? a:1 : expand(g:__oreo#lim#silo#rootdir). '/backup/'. a:1
     call writefile(fields + self.save_records, rollbackpath)
   end
 endfunction
