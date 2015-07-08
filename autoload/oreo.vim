@@ -550,9 +550,7 @@ endfunction
 "Public:
 function! oreo#lock() "{{{
   setl ro nobl
-  echoh WarningMsg
-  echo 'oreo: this file is not original file.'
-  echoh NONE
+  call feedkeys(":\<C-u>echoh WarningMsg | echo 'oreo: this file is not original file.' | echoh NONE\<CR>", 'n')
 endfunction
 "}}}
 "--------------------------------------
