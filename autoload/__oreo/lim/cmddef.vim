@@ -8,10 +8,6 @@ let s:TYPE_NUM = type(0)
 let s:TYPE_FLOAT = type(0.0)
 
 "Misc:
-function! s:split_into_words(cmdline) "{{{
-  return split(a:cmdline, '\%(\\\@!<\\\)\@<!\s\+')
-endfunction
-"}}}
 function! s:_matches(pat, list) "{{{
   if type(a:pat)==s:TYPE_LIST
     return filter(a:list, 'index(a:pat, v:val)!=-1')
@@ -133,37 +129,106 @@ function! s:_solve_variadic_for_set_default(variadic, default) "{{{
 endfunction
 "}}}
 
+function! s:func._solve_longopt_nomal(pat) "{{{
+  let i = match(self.args, '^'.a:pat. self._endpat, self._first)
+  if i==-1 || i > self._last
+    return ['', 0]
+  end
+  call self._adjust_ranges()
+  let optval = substitute(remove(self.args, i), '^'. a:pat, '', '')
+  return optval=='' ?  [1, 1] : [substitute(optval, '^'. self.assign, '', ''), 1]
+endfunction
+"}}}
+function! s:func._solve_shortopt_normal(pat) "{{{
+  let shortchr = matchstr(a:pat, '^'.self._shortoptbgn.'\zs.$')
+  let i = match(self.args, printf('^\%%(%s\)\@!\&^%s.\{-}%s.\{-}%s', self._longoptbgn, self._shortoptbgn, shortchr, self._endpat), self._first)
+  if i==-1 || i > self._last
+    return ['', 0]
+  end
+  let optval = matchstr(self.args[i], shortchr. '\zs'. self.assign.'.*$')
+  let self.args[i] = substitute(self.args[i], '^'. self._shortoptbgn.'.\{-}\zs'.shortchr. (optval=='' ? '' : self.assign.'.*'), '', '')
+  if self.args[i] ==# self._shortoptbgn
+    unlet self.args[i]
+    call self._adjust_ranges()
+  end
+  return optval=='' ? [1, 1] : [substitute(optval, '^'. self.assign, '', ''), 1]
+endfunction
+"}}}
+function! s:func._solve_whitespace(pat) "{{{
+  let i = index(self.args, a:pat, self._first)
+  if i==-1 || i > self._last
+    return ['', 0]
+  end
+  call self._adjust_ranges()
+  if self.__take_val && i <= self._last
+    let next = self.args[i+1]
+    if next !~ '^\%('. self._longoptbgn. '\|'. self._shortoptbgn. '\)'
+      let optval = self.args[i+1]
+      unlet self.args[i : i+1]
+      call self._adjust_ranges()
+      return [optval, 1]
+    end
+  end
+  unlet self.args[i]
+  return [1, 1]
+endfunction
+"}}}
+
 
 "=============================================================================
 "Main:
-let s:Cmdcmpl = {}
-function! __oreo#lim#cmddef#newCmdcmpl(cmdline, cursorpos, ...) abort "{{{
-  let obj = copy(s:Cmdcmpl)
+function! __oreo#lim#cmddef#split_into_words(cmdline) "{{{
+  return split(a:cmdline, '\%(\%([^\\]\|^\)\\\)\@<!\s\+')
+endfunction
+"}}}
+function! __oreo#lim#cmddef#continuable() "{{{
+  return exists('s:save_context')
+endfunction
+"}}}
+function! __oreo#lim#cmddef#continue() "{{{
+  if !exists('s:save_context')
+    return
+  end
+  let context = s:save_context
+  unlet s:save_context
+  let &wcm = context.wcm
+  return context.candidates
+endfunction
+"}}}
+
+let s:Cmpl = {}
+function! __oreo#lim#cmddef#newCmpl(cmdline, cursorpos, ...) abort "{{{
+  let obj = copy(s:Cmpl)
   let behavior = a:0 ? a:1 : {}
   let obj._longoptbgn = get(behavior, 'longoptbgn', '--')
   let obj._shortoptbgn = get(behavior, 'shortoptbgn', '-')
-  let obj.cmdline = a:cmdline
-  let obj.cursorpos = a:cursorpos
-  let obj._is_on_edge = a:cmdline[a:cursorpos-1]!=' ' ? 0 : a:cmdline[a:cursorpos-2]!='/' || a:cmdline[a:cursorpos-3]=='/'
-  let [obj.command; obj.inputs] = s:split_into_words(a:cmdline)
-  let obj.leftwords = s:split_into_words(a:cmdline[:(a:cursorpos-1)])[1:]
+  let obj.is_cmdwin = exists('*getcmdwintype') ? getcmdwintype()!='' : bufname('%') ==# '[Command Line]'
+  if v:version > 703 || v:version==703 && has('patch1260') || !obj.is_cmdwin
+    let obj.cmdline = a:cmdline
+    let obj.cursorpos = a:cursorpos
+  else
+    let cursorpos = col('.')-1
+    let cmdline = getline('.')
+    let obj.cmdline = cmdline[: cursorpos-1]. a:cmdline. cmdline[cursorpos :]
+    let obj.cursorpos = cursorpos + len(a:cmdline)
+  end
+  let obj._is_on_edge = obj.cmdline[obj.cursorpos-1]!=' ' ? 0 : obj.cmdline[obj.cursorpos-2]!='\' || obj.cmdline[obj.cursorpos-3]=='\'
+  let [obj.command; obj.inputs] = __oreo#lim#cmddef#split_into_words(obj.cmdline)
+  let obj.leftwords = __oreo#lim#cmddef#split_into_words(obj.cmdline[:(obj.cursorpos-1)])[1:]
   let obj.arglead = obj._is_on_edge ? '' : obj.leftwords[-1]
   let obj.preword = obj._is_on_edge ? get(obj.leftwords, -1, '') : get(obj.leftwords, -2, '')
   let obj._save_leftargscnt = {}
+  let obj._save_argscnt = {}
   return obj
 endfunction
 "}}}
-let s:Cmdcmpl._get_optignorepat = s:func._get_optignorepat
-let s:Cmdcmpl._get_arg = s:func._get_arg
-function! s:Cmdcmpl.get_arglead() "{{{
-  return self.arglead
-endfunction
-"}}}
-function! s:Cmdcmpl.has_bang() "{{{
+let s:Cmpl._get_optignorepat = s:func._get_optignorepat
+let s:Cmpl._get_arg = s:func._get_arg
+function! s:Cmpl.has_bang() "{{{
   return self.command =~ '!$'
 endfunction
 "}}}
-function! s:Cmdcmpl.count_lefts(...) "{{{
+function! s:Cmpl.count_lefts(...) "{{{
   let NULL = "\<C-n>"
   let ignorepat = a:0 ? a:1 : self._get_optignorepat()
   let ignorepat = ignorepat=='' ? NULL : ignorepat
@@ -179,106 +244,152 @@ function! s:Cmdcmpl.count_lefts(...) "{{{
   return self._save_leftargscnt[ignorepat]
 endfunction
 "}}}
-function! s:Cmdcmpl.should_optcmpl() "{{{
+function! s:Cmpl.count_inputted(...) "{{{
+  let NULL = "\<C-n>"
+  let ignorepat = a:0 ? a:1 : self._get_optignorepat()
+  let ignorepat = ignorepat=='' ? NULL : ignorepat
+  if has_key(self._save_argscnt, ignorepat)
+    return self._save_argscnt[ignorepat]
+  end
+  let inputs = copy(self.inputs)
+  if ignorepat != NULL
+    call filter(inputs, 'v:val !~# ignorepat')
+  end
+  let ret = len(inputs)
+  let self._save_argscnt[ignorepat] = self._is_on_edge ? ret : ret-1
+  return self._save_argscnt[ignorepat]
+endfunction
+"}}}
+function! s:Cmpl.should_optcmpl() "{{{
   let pat = '^'.self._shortoptbgn.'\|^'.self._longoptbgn
   return pat!='^\|^' && self.arglead =~# pat
 endfunction
 "}}}
-function! s:Cmdcmpl.is_matched(pat) "{{{
+function! s:Cmpl.is_matched(pat) "{{{
   return self.arglead =~# a:pat
 endfunction
 "}}}
-function! s:Cmdcmpl.get(pat, ...) "{{{
+function! s:Cmpl.get(pat, ...) "{{{
   return self._get_arg(a:pat, a:000, self.inputs)
 endfunction
 "}}}
-function! s:Cmdcmpl.matches(pat) "{{{
+function! s:Cmpl.get_parts(pat, len) "{{{
+  if a:len < 1
+    return []
+  end
+  let idx = match(self.inputs, a:pat)
+  return idx==-1 ? [] : self.inputs[idx : idx+ a:len-1]
+endfunction
+"}}}
+function! s:Cmpl.matches(pat) "{{{
   return s:_matches(a:pat, copy(self.inputs))
 endfunction
 "}}}
-function! s:Cmdcmpl.get_left(pat, ...) "{{{
+function! s:Cmpl.get_left(pat, ...) "{{{
   return self._get_arg(a:pat, a:000, self.leftwords)
 endfunction
 "}}}
-function! s:Cmdcmpl.match_lefts(pat) "{{{
+function! s:Cmpl.match_lefts(pat) "{{{
   return s:_matches(a:pat, copy(self.leftwords))
 endfunction
 "}}}
-function! s:Cmdcmpl._filtered_by_inputs(candidates) "{{{
+function! s:Cmpl._filtered_by_inputs(candidates) "{{{
   let assorter = s:newAssorter(self.inputs)
   call assorter.assort_candidates(a:candidates)
   return assorter.remove_del_grouped_candidates()
-  let canddicts = map(a:candidates, 's:dictify_{type(v:val)}(v:val)')
-  let should_del_groups = {}
-  for canddict in canddicts
-    if index(self.inputs, get(canddict, 'word', ''))!=-1
-      call extend(should_del_groups, canddict.division)
-    end
-  endfor
-  let expr = should_del_groups=={} ? '' : '!('. join(map(keys(should_del_groups), '"has_key(v:val.division, ''". v:val. "'')"'), '||'). ') &&'
-  call filter(canddicts, 'v:val!={} && ( v:val.is_parm || '. expr. ' index(self.inputs, v:val.word)==-1 )')
-  return map(canddicts, 'v:val.word')
 endfunction
 "}}}
-function! s:Cmdcmpl.filtered(candidates) "{{{
+function! s:Cmpl.filtered(candidates) "{{{
   let candidates = self._filtered_by_inputs(a:candidates)
-  return filter(candidates, 'v:val =~ "^".self.arglead')
+  let pat = '^\V'. escape(self.arglead, '\')
+  if self.arglead=~'\s'
+    let pat .= '\|'. escape(substitute(self.arglead, '\\\@<!\\ ', ' ', 'g'), '\')
+  end
+  return filter(candidates, 'v:val =~ pat')
 endfunction
 "}}}
-function! s:Cmdcmpl.backward_filtered(candidates) "{{{
+function! s:Cmpl.backward_filtered(candidates) "{{{
   let candidates = self._filtered_by_inputs(a:candidates)
-  return filter(candidates, 'v:val =~ self.arglead."$"')
+  let pat = '\V'. escape(self.arglead, '\'). '\$'
+  if self.arglead=~'\s'
+    let pat .= '\|'. escape(substitute(self.arglead, '\\\@<!\\ ', ' ', 'g'), '\')
+  end
+  return filter(candidates, 'v:val =~ pat')
 endfunction
 "}}}
-function! s:Cmdcmpl.partial_filtered(candidates) "{{{
+function! s:Cmpl.partial_filtered(candidates) "{{{
   let candidates = self._filtered_by_inputs(a:candidates)
-  return filter(candidates, 'v:val =~ self.arglead')
+  let pat = '\V'. escape(self.arglead, '\')
+  if self.arglead=~'\s'
+    let pat .= '\|'. escape(substitute(self.arglead, '\\\@<!\\ ', ' ', 'g'), '\')
+  end
+  return filter(candidates, 'v:val =~ pat')
 endfunction
 "}}}
-function! s:Cmdcmpl.exact_filtered(candidates) "{{{
+function! s:Cmpl.exact_filtered(candidates) "{{{
   let candidates = self._filtered_by_inputs(a:candidates)
   return filter(candidates, 'v:val == self.arglead')
+endfunction
+"}}}
+function! s:Cmpl.hail_space(filtered_candidates) "{{{
+  if self.arglead !~ '\s' || a:filtered_candidates==[] || v:version > 703 || v:version==703 && has('patch615')
+    return a:filtered_candidates
+  end
+  let s:save_context = {'wcm': &wcm, 'candidates': a:filtered_candidates}
+  if len(a:filtered_candidates) > 1 && index(s:save_context.candidates, self.arglead)==-1
+    call add(s:save_context.candidates, self.arglead)
+  end
+  set wcm=<Tab>
+  call feedkeys(repeat("\<BS>", len(self.arglead)+1). "\<Tab>", 'n')
+  return [matchstr(self.arglead, '\S\+$'). ' ']
 endfunction
 "}}}
 
 
 "--------------------------------------
-let s:CmdParser = {}
-function! __oreo#lim#cmddef#newCmdParser(args, ...) "{{{
-  let obj = copy(s:CmdParser)
+let s:Parser = {}
+function! __oreo#lim#cmddef#newParser(args, ...) "{{{
+  let obj = copy(s:Parser)
   let behavior = a:0 ? a:1 : {}
   let obj._longoptbgn = get(behavior, 'longoptbgn', '--')
   let obj._shortoptbgn = get(behavior, 'shortoptbgn', '-')
-  let obj.assignpat = get(behavior, 'assignpat', '=')
-  let obj.endpat = '\%('. obj.assignpat. '\(.*\)\)\?$'
+  let obj.assign = get(behavior, 'assign', '=')
+  if obj.assign=~'\s'
+    let obj._solve_longopt = s:func._solve_whitespace
+    let obj._solve_shortopt = s:func._solve_whitespace
+  else
+    let obj._endpat = '\%('. obj.assign. '\(.*\)\)\?$'
+    let obj._solve_longopt = s:func._solve_longopt_nomal
+    let obj._solve_shortopt = s:func._solve_shortopt_normal
+  end
   let obj.args = a:args
   let obj.args_original = copy(a:args)
   return obj
 endfunction
 "}}}
-let s:CmdParser._get_optignorepat = s:func._get_optignorepat
-let s:CmdParser._get_arg = s:func._get_arg
-function! s:CmdParser.get(pat, ...) "{{{
+let s:Parser._get_optignorepat = s:func._get_optignorepat
+let s:Parser._get_arg = s:func._get_arg
+function! s:Parser.get(pat, ...) "{{{
   return self._get_arg(a:pat, a:000, self.args)
 endfunction
 "}}}
-function! s:CmdParser.matches(pat) "{{{
+function! s:Parser.matches(pat) "{{{
   return s:_matches(a:pat, copy(self.args))
 endfunction
 "}}}
-function! s:CmdParser.divide(pat, ...) "{{{
+function! s:Parser.divide(pat, ...) "{{{
   let way = a:0 ? a:1 : 'sep'
   let self._len = len(self.args)
   try
     let ret = self['_divide_'. way](a:pat)
   catch /E716/
-    echoerr 'CmdParser: invalid way > "'. way. '"'
+    echoerr 'Parser: invalid way > "'. way. '"'
     return self.arg
   endtry
   return ret==[[]] ? [] : ret
 endfunction
 "}}}
-function! s:CmdParser.filter(pat, ...) "{{{
+function! s:Parser.filter(pat, ...) "{{{
   let __cmpparser_args__ = self.args
   if a:0
     for __cmpparser_key__ in keys(a:1)
@@ -288,42 +399,43 @@ function! s:CmdParser.filter(pat, ...) "{{{
   return filter(__cmpparser_args__, a:pat)
 endfunction
 "}}}
-function! s:CmdParser.parse_options(optdict, ...) "{{{
+function! s:Parser.parse_options(optdict, ...) "{{{
   let [self._first, self._last] = a:0 ? type(a:1)==s:TYPE_LIST ? a:1 : [a:1, a:1] : [0, -1]
   let self._last = self._last < 0 ? len(self.args) + self._last : self._last
   let ret = {}
   for [key, vals] in items(a:optdict)
-    let ret[key] = self._get_optval(self._get_optval_evalset(vals, key))
+    let ret[key] = self._get_optval(self._interpret_optdict_elms(vals, self._longoptbgn. key))
     unlet vals
   endfor
   return ret
 endfunction
 "}}}
 
-function! s:CmdParser._get_optval_evalset(vals, part_of_pats) "{{{
-  let [default, pats, invertpats] = [0, [self._longoptbgn. a:part_of_pats], []]
+function! s:Parser._interpret_optdict_elms(vals, pat) "{{{
+  let [default, pats, invertpats, take_val] = [0, [a:pat], [], 1]
   if type(a:vals) != s:TYPE_LIST
-    return [a:vals, pats, invertpats]
+    return [a:vals, pats, invertpats, take_val]
   end
   let types = map(copy(a:vals), 'type(v:val)')
-  if index(types, s:TYPE_LIST)==-1
-    return a:vals==[] ? [default, pats, invertpats] : types[0]== s:TYPE_STR ? [default, a:vals, invertpats] : [a:vals, pats, invertpats]
-  end
-  let [len, i, done_pats] = [len(a:vals), 0, 0]
+  let [len, i, done_pats, done_default] = [len(a:vals), 0, 0, 0]
   while i < len
     if types[i]==s:TYPE_LIST
-      exe 'let' (done_pats ? 'invertpats' : 'pats') '= a:vals[i]'
+      let {done_pats ? 'invertpats' : 'pats'} = a:vals[i]
       let done_pats = 1
-    else
+    elseif types[i]==s:TYPE_STR
       let default = a:vals[i]
+      let done_default = 1
+    else
+      let {done_default ? 'take_val' : 'default'} = a:vals[i]
+      let done_default = 1
     end
     let i += 1
   endwhile
-  return [default, pats, invertpats]
+  return [default, pats, invertpats, take_val]
 endfunction
 "}}}
-function! s:CmdParser._get_optval(optval_evalset) "{{{
-  let [default, optpats, invertpats] = a:optval_evalset
+function! s:Parser._get_optval(optdict_elms) "{{{
+  let [default, optpats, invertpats, self.__take_val] = a:optdict_elms
   if self._first<0
     return default
   end
@@ -342,41 +454,22 @@ function! s:CmdParser._get_optval(optval_evalset) "{{{
   return default
 endfunction
 "}}}
-function! s:CmdParser._solve_optpat(pat) "{{{
+function! s:Parser._solve_optpat(pat) "{{{
   if a:pat =~# '^'.self._longoptbgn || a:pat !~# '^'.self._shortoptbgn.'.$'
-    let i = match(self.args, '^'.a:pat. self.endpat, self._first)
-    if i!=-1 && i <= self._last
-      call self._adjust_ranges()
-      return [self._solve_optval(substitute(remove(self.args, i), '^'. a:pat, '', '')), 1]
-    end
-  else
-    let shortchr = matchstr(a:pat, '^'.self._shortoptbgn.'\zs.$')
-    let i = match(self.args, printf('^\%%(%s\)\@!\&^%s.\{-}%s.\{-}%s', self._longoptbgn, self._shortoptbgn, shortchr, self.endpat), self._first)
-    if i!=-1 && i <= self._last
-      let optval = matchstr(self.args[i], shortchr. '\zs'. self.assignpat.'.*$')
-      let self.args[i] = substitute(self.args[i], '^'. self._shortoptbgn.'.\{-}\zs'.shortchr. (optval=='' ? '' : self.assignpat.'.*'), '', '')
-      if self.args[i] ==# self._shortoptbgn
-        unlet self.args[i]
-        call self._adjust_ranges()
-      end
-      return [self._solve_optval(optval), 1]
-    end
+    return self._solve_longopt(a:pat)
   end
-  return ['', 0]
+  return self._solve_shortopt(a:pat)
 endfunction
 "}}}
-function! s:CmdParser._solve_optval(optval) "{{{
-  return a:optval=='' ? 1 : matchstr(a:optval, '^'. self.assignpat. '\zs.*')
-endfunction
-"}}}
-function! s:CmdParser._adjust_ranges() "{{{
+function! s:Parser._adjust_ranges() "{{{
   if self._first == self._last
     let self._first -= 1
   end
   let self._last -= 1
 endfunction
 "}}}
-function! s:CmdParser._get_firstmatch_idx(patlist, bgnidx) "{{{
+
+function! s:Parser._get_firstmatch_idx(patlist, bgnidx) "{{{
   let i = a:bgnidx
   while i < self._len
     if index(a:patlist, self.args[i])!=-1
@@ -387,7 +480,7 @@ function! s:CmdParser._get_firstmatch_idx(patlist, bgnidx) "{{{
   return -1
 endfunction
 "}}}
-function! s:CmdParser._divide_start(pat) "{{{
+function! s:Parser._divide_start(pat) "{{{
   let expr = type(a:pat)==s:TYPE_LIST ? 'self._get_firstmatch_idx(a:pat, i+1)' : 'match(self.args, a:pat, i+1)'
   let ret = []
   let i = 0
@@ -401,7 +494,7 @@ function! s:CmdParser._divide_start(pat) "{{{
   return ret
 endfunction
 "}}}
-function! s:CmdParser._divide_sep(pat) "{{{
+function! s:Parser._divide_sep(pat) "{{{
   let expr = type(a:pat)==s:TYPE_LIST ? 'self._get_firstmatch_idx(a:pat, i)' : 'match(self.args, a:pat, i)'
   let ret = []
   let i = 0
@@ -419,7 +512,7 @@ function! s:CmdParser._divide_sep(pat) "{{{
   return ret
 endfunction
 "}}}
-function! s:CmdParser._divide_stop(pat) "{{{
+function! s:Parser._divide_stop(pat) "{{{
   let expr = type(a:pat)==s:TYPE_LIST ? 'self._get_firstmatch_idx(a:pat, i)' : 'match(self.args, a:pat, i)'
   let ret = []
   let i = 0

@@ -6,8 +6,9 @@ let s:TYPE_NR = type(0)
 
 "Misc:
 function! s:_get_rootpath_and_rootname_of(path) "{{{
+  let path = isdirectory(a:path) ? a:path : fnamemodify(a:path, ':h')
   for dir in ['after', 'autoload', 'plugin', 'syntax', 'ftplugin', 'ftdetect']
-    let findpath = finddir(dir, a:path. ';**/vimfiles;**/.vim')
+    let findpath = finddir(dir, path. ';**/vimfiles;**/.vim')
     if findpath == ''
       continue
     end
@@ -58,8 +59,37 @@ endfunction
 
 "=============================================================================
 "Vim:
+function! __oreo#lim#misc#viminfo_path() "{{{
+  let path = matchstr(&viminfo, '^\%(.\+,\)\?n\zs.\+$')
+  if path!=''
+    return path
+  else
+    return (exists('$HOME') ? '$HOME' : exists('$VIM') ? '$VIM' : 'c:'). (has('win32') || has('win64') ? '/_viminfo' : '/.viminfo')
+  end
+endfunction
+"}}}
+function! __oreo#lim#misc#total_winheight() "{{{
+  let ls = &laststatus>1 || &laststatus && winnr('$')>1
+  let stal = &showtabline>1 || &showtabline && tabpagenr('$')>1
+  return &lines - stal - ls - &l:cmdheight
+endfunction
+"}}}
 function! __oreo#lim#misc#expand_keycodes(str) "{{{
   return substitute(a:str, '<\S\{-1,}>', '\=eval(''"\''. submatch(0). ''"'')', 'g')
+endfunction
+"}}}
+function! __oreo#lim#misc#get_emptybufnr(...) "{{{
+  let targnrs = range(bufnr('$'), 1, -1)
+  if a:0
+    let ignore_bufs = a:1
+    call filter(targnrs, 'index(ignore_bufs, v:val)==-1')
+  end
+  for n in targnrs
+    if bufname(n)=='' && match(getbufline(n, 1, '$'), '\S')==-1
+      return n
+    end
+  endfor
+  return 0
 endfunction
 "}}}
 
@@ -103,15 +133,16 @@ function! __oreo#lim#misc#get_scriptpath(sid) "{{{
 endfunction
 "}}}
 function! __oreo#lim#misc#get_scriptinfos(...) "{{{
-  let pat = !a:0 ? expand('%') : type(a:1)==s:TYPE_NR ? '^\s*'.a:1.':' : escape(a:1, ' .\')
-  let snames = __oreo#lim#misc#get_cmdresults('scriptnames')
-  let ret = []
-  let idx = match(snames, pat)
-  while idx!=-1
-    call add(ret, snames[idx])
-    let idx = match(snames, pat, idx+1)
-  endwhile
-  return ret
+  if a:0 > 1
+    let expr = 'v:val =~ '''. escape(a:1, ' .\'). ''''
+    for str in a:000[1:]
+      let expr .= ' && v:val =~ '''. escape(str, ' .\'). ''''
+    endfor
+  else
+    let pat = !a:0 ? expand('%') : type(a:1)==s:TYPE_NR ? '^\s*'.a:1.':' : escape(a:1, ' .\')
+    let expr = 'v:val =~ pat'
+  end
+  return filter(__oreo#lim#misc#get_cmdresults('scriptnames'), expr)
 endfunction
 "}}}
 

@@ -125,7 +125,7 @@ function! s:newReci(reciroot, reciname) "{{{
   let b = a:reciname==''
   let [reciroot, reciname] = ['', '']
   if a || b
-    let [reciroot, reciname] = s:_infer_reciroot_and_pluginname(a ? expand('%:p:h') : a:reciroot)
+    let [reciroot, reciname] = s:_infer_reciroot_and_pluginname(a ? expand(bufname('%')==#'[Command Line]' ? '#:p:h' : '%:p:h') : a:reciroot)
   end
   let obj.root = a ? reciroot : s:expand_reciroot(a:reciroot)
   let maybename = globpath(obj.root, 'autoload/'. s:MESON. '*/')
@@ -555,11 +555,11 @@ endfunction
 "}}}
 "--------------------------------------
 function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
-  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmpl(a:cmdline, a:curpos)
   let reciroot = cmpl.get('^\%(--root\|-r\)=\zs.*')
   if cmpl.should_optcmpl()
     if reciroot==''
-      let reciroot = get(__oreo#lim#misc#infer_plugin_pathinfo(expand('%:p')), 'root', '')
+      let reciroot = get(__oreo#lim#misc#infer_plugin_pathinfo(expand(cmpl.is_cmdwin ? '#:p' : '%:p')), 'root', '')
     end
     let maybename = globpath(reciroot, 'autoload/'. s:MESON. '*/')
     if maybename==''
@@ -582,7 +582,7 @@ function! oreo#cmpl_attract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
-  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--lib', 1], ['--root=', 2], ['-l', 1], ['-r=', 2]])
   end
@@ -598,7 +598,7 @@ function! oreo#cmpl_extract(arglead, cmdline, curpos) "{{{
 endfunction
 "}}}
 function! oreo#cmpl_update(arglead, cmdline, curpos) "{{{
-  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--lib', 1], ['--root=', 2], ['--verpersonalize', 3], ['-l', 1], ['-r=', 2], ['-v', 3]])
   end
@@ -613,13 +613,16 @@ function! oreo#cmpl_update(arglead, cmdline, curpos) "{{{
   return cmpl.filtered(s:fetch_attracted_libnames(reci))
 endfunction
 "}}}
-function! oreo#cmpl_libs(arglead, cmdline, curpos) "{{{
-  let beens = split(a:cmdline)[1:]
-  return filter(s:get_libnames(), 'v:val=~"^".a:arglead && index(beens, v:val)==-1')
+function! oreo#cmpl_status(arglead, cmdline, curpos) "{{{
+  let cmpl = __oreo#lim#cmddef#newCmpl(a:cmdline, a:curpos)
+  if !cmpl.has_bang() && cmpl.should_optcmpl()
+    return cmpl.filtered([['--root=', 1], ['-r=', 1]])
+  end
+  return cmpl.filtered(s:get_libnames())
 endfunction
 "}}}
 function! oreo#cmpl_diff(arglead, cmdline, curpos) "{{{
-  let cmpl = __oreo#lim#cmddef#newCmdcmpl(a:cmdline, a:curpos)
+  let cmpl = __oreo#lim#cmddef#newCmpl(a:cmdline, a:curpos)
   if cmpl.should_optcmpl()
     return cmpl.filtered([['--root=', 1], ['-r=', 1]])
   end
@@ -638,7 +641,7 @@ function! oreo#enter_attract(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], ''], 'reciname': [['--name', '-n'], ''], 'verpersonalize': [['--verpersonalize', '-v'], 0]})
   let reci = s:newReci(opts.reciroot, opts.reciname)
   if reci.is_invalid
@@ -665,7 +668,7 @@ function! s:_common_enter_update(args, optdict) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newParser(a:args)
   let opts = parser.parse_options(a:optdict)
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -685,7 +688,7 @@ function! oreo#enter_status(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
@@ -699,7 +702,7 @@ function! oreo#enter_diff(args) "{{{
   if a:args!=[]
     let a:args[-1] = substitute(a:args[-1], '\s\+$', '', '')
   end
-  let parser = __oreo#lim#cmddef#newCmdParser(a:args)
+  let parser = __oreo#lim#cmddef#newParser(a:args)
   let opts = parser.parse_options({'reciroot': [['--root', '-r'], '']})
   let reci = s:newReci(opts.reciroot, '')
   if reci.is_invalid
